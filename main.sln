@@ -3,12 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "main", "build\main.exe", "{17A639D6-BF1B-490E-9848-1786D8C48622}"
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "main", "build\main.exe", "{7B7895C7-ADC7-42F1-981B-41A7A0774C0C}"
 	ProjectSection(DebuggerProjectSystem) = preProject
 		PortSupplier = 00000000-0000-0000-0000-000000000000
-		Executable = D:\Programming\C++\TileMapEditor\build\main.exe
+		Executable = D:\Programming\GitHub\Tile-Map-Editor\build\main.exe
 		RemoteMachine = DENISPC
-		StartingDirectory = D:\Programming\C++\TileMapEditor\data
+		StartingDirectory = D:\Programming\GitHub\Tile-Map-Editor\data
 		Environment = Default
 		LaunchingEngine = 00000000-0000-0000-0000-000000000000
 		UseLegacyDebugEngines = No
@@ -21,7 +21,7 @@ Global
 		Debug|x64 = Debug|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{17A639D6-BF1B-490E-9848-1786D8C48622}.Debug|x64.ActiveCfg = Debug|x64
+		{7B7895C7-ADC7-42F1-981B-41A7A0774C0C}.Debug|x64.ActiveCfg = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

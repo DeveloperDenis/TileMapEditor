@@ -74,7 +74,7 @@ int main(int argc, char* argv[])
 	if (renderer && initUI(renderer, "LiberationMono-Regular.ttf", 16))
 	{
 	    bool running = true;
-
+	    
 	    int tileMapStartX = 5;
 	    int tileMapStartY = 5;
 	    
@@ -146,6 +146,35 @@ int main(int argc, char* argv[])
 			    running = false;
 			} break;
 
+			case SDL_WINDOWEVENT:
+			{
+			    if (event.window.event == SDL_WINDOWEVENT_RESIZED)
+			    {
+				if (tileMap)
+				{
+				    int windowWidth = event.window.data1;
+				    int windowHeight = event.window.data2;
+				    
+				    tileMapStartX = windowWidth/2 - tileSize*tileMapWidth/2;
+				    tileMapStartY = windowHeight/2 - tileSize*tileMapHeight/2;
+
+				    TexturedRect *row = tileMap;
+				    for (int i = 0; i < tileMapHeight; ++i)
+				    {
+					TexturedRect *element = row;
+					for (int j = 0; j < tileMapWidth; ++j)
+					{
+					    element->pos.x = tileMapStartX + j*tileSize;
+					    element->pos.y = tileMapStartY + i*tileSize;
+					    ++element;
+					}
+					row += tileMapWidth;
+				    }
+				}
+			    }
+			    
+			} break;
+			
 			case SDL_MOUSEBUTTONUP:
 			{
 			    int x = event.button.x;
@@ -155,9 +184,6 @@ int main(int argc, char* argv[])
 
 			    if (pointInRect(x, y, createNewButton.pos))
 			    {
-				//TODO(denis): save all the important data
-				// destroy all stuff on screen
-				// initialize new tile map
 				EditText *nameText = getEditTextByID(MAP_NAME_TEXT);
 				tileMapName = nameText->text;
 
@@ -183,9 +209,17 @@ int main(int argc, char* argv[])
 
 				    if (tileMap)
 				    {
+					int windowHeight = 0;
+					int windowWidth = 0;
+
+					SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+					
+					tileMapStartX = windowWidth/2 - tileSize*tileMapWidth/2;
+					tileMapStartY = windowHeight/2 - tileSize*tileMapHeight/2;
+					
 					SDL_Surface *background = SDL_CreateRGBSurface(0, tileSize, tileSize, 32, 0, 0, 0, 0);
 					SDL_FillRect(background, NULL, 0xFFFF00FF);
-
+					
 					//TODO(denis): dunno if there is any noticable
 					// speed boost from not just calling
 					//createFilledTexturedRect here
