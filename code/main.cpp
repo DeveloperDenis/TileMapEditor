@@ -11,6 +11,7 @@
 
 #include <SDL.h>
 #include "SDL_ttf.h"
+#include "SDL_image.h"
 #include "windows.h"
 #include <math.h>
 #include "UIElements.h"
@@ -20,12 +21,85 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 
+struct Tile
+{
+    SDL_Rect pos;
+    SDL_Rect sheetPos;
+};
+
+struct TileMap
+{
+    Tile *tiles;
+    Uint32 tileSize;
+    Uint32 widthInTiles;
+    Uint32 heightInTiles;
+};
+
+static bool moveSelectionBox(TexturedRect *selectionBox, Sint32 mouseX, Sint32 mouseY,
+			     TileMap *tileMap, TexturedRect *otherArea)
+{
+    bool shouldBeDrawn = true;
+    
+    if (selectionBox->image != NULL)
+    {
+	Uint32 tileMapStartX = tileMap->tiles->pos.x;
+	Uint32 tileMapStartY = tileMap->tiles->pos.y;
+	Uint32 tileSize = tileMap->tileSize;
+
+	if (pointInRect(mouseX, mouseY, {tileMapStartX, tileMapStartY, tileMap->widthInTiles*tileSize, tileMap->heightInTiles*tileSize}))
+	{
+	    selectionBox->pos.x = ((mouseX-tileMapStartX)/tileSize) * tileSize + tileMapStartX;
+	    selectionBox->pos.y = ((mouseY-tileMapStartY)/tileSize) * tileSize + tileMapStartY;
+	}
+	else if (pointInRect(mouseX, mouseY, otherArea->pos))
+	{
+	    selectionBox->pos.x = ((mouseX-otherArea->pos.x)/tileMap->tileSize) * tileMap->tileSize + otherArea->pos.x;
+	    selectionBox->pos.y = ((mouseY-otherArea->pos.y)/tileMap->tileSize) * tileMap->tileSize + otherArea->pos.y;
+	}
+	else
+	    shouldBeDrawn = false;
+    }
+
+    return shouldBeDrawn;
+}
+
+static void reorientEditingArea(SDL_Window *window, int tileSize, int padding,
+				int mapWidthInTiles, int mapHeightInTiles,
+				int *mapStartingX, int *mapStartingY)
+{
+    int windowHeight = 0;
+    int windowWidth = 0;
+
+    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+    int widthSpace = windowWidth - tileSize*mapWidthInTiles;
+    int heightSpace = windowHeight - tileSize*mapHeightInTiles;
+
+    if (widthSpace > heightSpace)
+    {
+	*mapStartingX = padding;
+        *mapStartingY = windowHeight/2 - tileSize*mapHeightInTiles/2;
+    }
+    else
+    {
+	*mapStartingY = padding;
+        *mapStartingX = windowWidth/2 - tileSize*mapWidthInTiles/2;
+    }
+}
+
 static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
 					     int width, int height, Uint32 colour)
 {
     TexturedRect result = {};
+
+    Uint32 rmask, gmask, bmask, amask;
+    amask = 0xFF000000;
+    bmask = 0x00FF0000;
+    gmask = 0x0000FF00;
+    rmask = 0x000000FF;
     
-    SDL_Surface *rectangle = SDL_CreateRGBSurface(0, width, height, 32, 0, 0, 0, 0);
+    SDL_Surface *rectangle = SDL_CreateRGBSurface(0, width, height, 32,
+						  rmask, gmask, bmask, amask);
     SDL_FillRect(rectangle, NULL, colour);
     result.image = SDL_CreateTextureFromSurface(renderer, rectangle);
     SDL_GetClipRect(rectangle, &result.pos);
@@ -71,18 +145,26 @@ int main(int argc, char* argv[])
 	//TODO(denis): maybe add renderer flags?
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 
-	if (renderer && initUI(renderer, "LiberationMono-Regular.ttf", 16))
+	if (renderer && initUI(renderer, "LiberationMono-Regular.ttf", 16)
+	    && IMG_Init(IMG_INIT_PNG) != 0)
 	{
 	    bool running = true;
 	    
 	    int tileMapStartX = 5;
 	    int tileMapStartY = 5;
+
+	    int tileMapPadding = 15;
+	    
+	    char *tileSetFileName = "some_tiles.png";
+	    TexturedRect currentTileSet = {};
 	    
 	    char *tileMapName = NULL;
-	    int tileSize = 0;
-	    int tileMapWidth = 0;
-	    int tileMapHeight = 0;
-	    TexturedRect *tileMap = NULL;
+
+	    TileMap tileMap = {};
+
+	    bool selectionVisible = false;
+	    TexturedRect selectionBox = {};
+	    TexturedRect selectedTile = {};
 	    
 	    const int MAP_NAME_TEXT = 0;
 	    const int TILE_SIZE_TEXT = 1;
@@ -126,7 +208,7 @@ int main(int argc, char* argv[])
 
 	    bool buttonVisible = true;
 	    TexturedRect createNewButton =
-		createFilledTexturedRect(renderer, 200, 100, 0x000000FF);
+		createFilledTexturedRect(renderer, 200, 100, 0xFFFF0000);
 	    createNewButton.pos.x = 500;
 	    createNewButton.pos.y = 500;
 	    addNewTextField("Create New Map", createNewButton.pos.x + 20,
@@ -150,29 +232,35 @@ int main(int argc, char* argv[])
 			{
 			    if (event.window.event == SDL_WINDOWEVENT_RESIZED)
 			    {
-				if (tileMap)
+				if (tileMap.tiles)
 				{
-				    int windowWidth = event.window.data1;
-				    int windowHeight = event.window.data2;
+				    //TODO(denis): make this method take a TileMap as a parameter?
+				    reorientEditingArea(window, tileMap.tileSize, tileMapPadding,
+							tileMap.widthInTiles, tileMap.heightInTiles, &tileMapStartX, &tileMapStartY);
 				    
-				    tileMapStartX = windowWidth/2 - tileSize*tileMapWidth/2;
-				    tileMapStartY = windowHeight/2 - tileSize*tileMapHeight/2;
-
-				    TexturedRect *row = tileMap;
-				    for (int i = 0; i < tileMapHeight; ++i)
+				    Tile *row = tileMap.tiles;
+				    for (Uint32 i = 0; i < tileMap.heightInTiles; ++i)
 				    {
-					TexturedRect *element = row;
-					for (int j = 0; j < tileMapWidth; ++j)
+					Tile *element = row;
+					for (Uint32 j = 0; j < tileMap.widthInTiles; ++j)
 					{
-					    element->pos.x = tileMapStartX + j*tileSize;
-					    element->pos.y = tileMapStartY + i*tileSize;
+					    element->pos.x = tileMapStartX + j*tileMap.tileSize;
+					    element->pos.y = tileMapStartY + i*tileMap.tileSize;
 					    ++element;
 					}
-					row += tileMapWidth;
+					row += tileMap.widthInTiles;
 				    }
 				}
 			    }
 			    
+			} break;
+
+			case SDL_MOUSEMOTION:
+			{
+			    Sint32 mouseX = event.motion.x;
+			    Sint32 mouseY = event.motion.y;
+
+			    selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet);
 			} break;
 			
 			case SDL_MOUSEBUTTONUP:
@@ -187,12 +275,12 @@ int main(int argc, char* argv[])
 				EditText *nameText = getEditTextByID(MAP_NAME_TEXT);
 				tileMapName = nameText->text;
 
-				tileSize = convertStringToInt(tileSizeText->text, tileSizeText->letterCount);
-				tileMapWidth = convertStringToInt(widthTextTiles->text, widthTextTiles->letterCount);
-				tileMapHeight = convertStringToInt(heightTextTiles->text, heightTextTiles->letterCount);
+				tileMap.tileSize = (Uint32)convertStringToInt(tileSizeText->text, tileSizeText->letterCount);
+			        tileMap.widthInTiles = (Uint32)convertStringToInt(widthTextTiles->text, widthTextTiles->letterCount);
+				tileMap.heightInTiles = (Uint32)convertStringToInt(heightTextTiles->text, heightTextTiles->letterCount);
 
-				if (tileMapName && tileSize != 0 &&
-				    tileMapWidth != 0 && tileMapHeight != 0)
+				if (tileMapName && tileMap.tileSize != 0 &&
+				    tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
 				{
 				    deleteAllEditTexts();
 				    deleteAllTextFields();
@@ -201,52 +289,45 @@ int main(int argc, char* argv[])
 				    SDL_DestroyTexture(createNewButton.image);
 				    createNewButton.image = NULL;
 
-				    int memorySize = sizeof(TexturedRect)*tileMapWidth*tileMapHeight;
+				    int memorySize = sizeof(Tile)*tileMap.widthInTiles*tileMap.heightInTiles;
 				    
 				    HANDLE heapHandle = GetProcessHeap();
-				    tileMap = (TexturedRect*) HeapAlloc(heapHandle, HEAP_ZERO_MEMORY,
+				    tileMap.tiles = (Tile*) HeapAlloc(heapHandle, HEAP_ZERO_MEMORY,
 						        memorySize);
 
-				    if (tileMap)
+				    if (tileMap.tiles)
 				    {
-					int windowHeight = 0;
-					int windowWidth = 0;
-
-					SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+					reorientEditingArea(window, tileMap.tileSize, tileMapPadding, tileMap.widthInTiles, tileMap.heightInTiles,
+							    &tileMapStartX, &tileMapStartY);
 					
-					tileMapStartX = windowWidth/2 - tileSize*tileMapWidth/2;
-					tileMapStartY = windowHeight/2 - tileSize*tileMapHeight/2;
-					
-					SDL_Surface *background = SDL_CreateRGBSurface(0, tileSize, tileSize, 32, 0, 0, 0, 0);
-					SDL_FillRect(background, NULL, 0xFFFF00FF);
-					
-					//TODO(denis): dunno if there is any noticable
-					// speed boost from not just calling
-					//createFilledTexturedRect here
-					TexturedRect *row = tileMap;
-					for (int i = 0; i < tileMapHeight; ++i)
+					Tile *row = tileMap.tiles;
+					for (Uint32 i = 0; i < tileMap.heightInTiles; ++i)
 					{
-					    TexturedRect *element = row;
-					    for (int j = 0; j < tileMapWidth; ++j)
+					    Tile *element = row;
+					    for (Uint32 j = 0; j < tileMap.widthInTiles; ++j)
 					    {
-						SDL_Texture *texture;
 						SDL_Rect rect;
 						
-						texture = SDL_CreateTextureFromSurface(renderer, background);
-						SDL_GetClipRect(background, &rect);
-
-						rect.x = tileMapStartX + j*tileSize;
-						rect.y = tileMapStartY + i*tileSize;
+						rect.h = tileMap.tileSize;
+						rect.w = tileMap.tileSize;
+						rect.x = tileMapStartX + j*tileMap.tileSize;
+						rect.y = tileMapStartY + i*tileMap.tileSize;
 						
-					        element->image = texture;
 						element->pos = rect;
 
 						++element;
 					    }
-					    row += tileMapWidth;
+					    row += tileMap.widthInTiles;
 					}
 
-					SDL_FreeSurface(background);
+					SDL_Surface *tiles = IMG_Load(tileSetFileName);
+					currentTileSet.image = SDL_CreateTextureFromSurface(renderer, tiles);
+					SDL_GetClipRect(tiles, &currentTileSet.pos);
+					SDL_FreeSurface(tiles);
+
+					selectionBox = createFilledTexturedRect(
+					    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
+					selectionVisible = moveSelectionBox(&selectionBox, x, y, &tileMap, &currentTileSet);
 				    }
 				}
 				else
@@ -255,16 +336,27 @@ int main(int argc, char* argv[])
 				}
 			    }
 
-			    if (tileMap &&
-				pointInRect(x, y, {tileMapStartX, tileMapStartY, tileSize*tileMapWidth, tileSize*tileMapHeight}))
-			    {
-				int tileX = (x-tileMapStartX)/tileSize;
-				int tileY = (y-tileMapStartY)/tileSize;
 
-				TexturedRect *clicked = tileMap + tileX + tileY*tileMapWidth;
-				TexturedRect temp = createFilledTexturedRect(renderer, tileSize,
-									     tileSize, 0x0000FFFF);
-				clicked->image = temp.image;
+			    //TODO(denis): THERE MIGHT BE A MEMORY LEAK?
+			    // probably check that out
+			    if (tileMap.tiles &&
+				pointInRect(x, y, {tileMapStartX, tileMapStartY, tileMap.tileSize*tileMap.widthInTiles, tileMap.tileSize*tileMap.heightInTiles}))
+			    {
+				int tileX = (x-tileMapStartX)/tileMap.tileSize;
+				int tileY = (y-tileMapStartY)/tileMap.tileSize;
+
+				Tile *clicked = tileMap.tiles + tileX + tileY*tileMap.widthInTiles;
+				clicked->sheetPos = selectedTile.pos;
+			    }
+			    else if (tileMap.tiles &&
+				     pointInRect(x, y, currentTileSet.pos))
+			    {
+				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.pos.x)/tileMap.tileSize * tileMap.tileSize;
+				selectedTile.pos.y = (selectionBox.pos.y - currentTileSet.pos.y)/tileMap.tileSize * tileMap.tileSize;
+				selectedTile.pos.w = tileMap.tileSize;
+				selectedTile.pos.h = tileMap.tileSize;
+				
+				selectedTile.image = currentTileSet.image;
 			    }
 			    
 			} break;
@@ -368,30 +460,59 @@ int main(int argc, char* argv[])
 		drawTextFields();
 		drawEditTexts();
 
-		if (tileMap && tileMapWidth != 0 && tileMapHeight != 0)
+		if (currentTileSet.image != NULL)
 		{
-		    TexturedRect *row = tileMap;
-		    for (int i = 0; i < tileMapHeight; ++i)
+		    if (tileMapStartX == tileMapPadding)
 		    {
-			TexturedRect *element = row;
-			for (int j = 0; j < tileMapWidth; ++j)
+			//NOTE(denis): draw on right side
+			//TODO(denis): draw it centred on the right side
+			currentTileSet.pos.x = tileMapStartX + tileMap.widthInTiles*tileMap.tileSize + 50;
+			currentTileSet.pos.y = 50;
+		    }
+		    else if (tileMapStartY == tileMapPadding)
+		    {
+                        //NOTE(denis): draw on bottom
+			//TODO(denis): draw it centred on the bottom
+			currentTileSet.pos.x = 50;
+			currentTileSet.pos.y = tileMapStartY + tileMap.heightInTiles*tileMap.tileSize + 50;
+		    }
+
+		    SDL_RenderCopy(renderer, currentTileSet.image, NULL, &currentTileSet.pos);
+		}
+		
+		if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
+		{
+		    TexturedRect defaultTile = createFilledTexturedRect(renderer, tileMap.tileSize, tileMap.tileSize, 0xFF00FFFF);
+		    Tile *row = tileMap.tiles;
+		    for (Uint32 i = 0; i < tileMap.heightInTiles; ++i)
+		    {
+			Tile *element = row;
+			for (Uint32 j = 0; j < tileMap.widthInTiles; ++j)
 			{
-			    SDL_RenderCopy(renderer, element->image, NULL, &element->pos);
+			    if (element->sheetPos.w == 0 && element->sheetPos.h == 0)
+			    {
+				SDL_RenderCopy(renderer, defaultTile.image, NULL, &element->pos);
+			    }
+			    else
+				SDL_RenderCopy(renderer, currentTileSet.image, &element->sheetPos, &element->pos);
+
 			    ++element;
 			}
 
-			row += tileMapWidth;
+			row += tileMap.widthInTiles;
 		    }
 
-		    SDL_SetRenderDrawColor(renderer, 255, 255,255,255);
-		    SDL_RenderDrawLine(renderer, tileMapStartX, tileMapStartY, tileMapStartX, tileMapStartY+tileMapHeight*tileSize);
+		    if (selectionVisible)
+			SDL_RenderCopy(renderer, selectionBox.image, NULL, &selectionBox.pos);
 		}
 		
 		SDL_RenderPresent(renderer);
 	    }
 
-	    if (tileMap)
-		HeapFree(GetProcessHeap(), 0, tileMap);
+	    IMG_Quit();
+	    
+	    if (tileMap.tiles)
+		HeapFree(GetProcessHeap(), 0, tileMap.tiles);
 	}
 	
 	destroyUI();
