@@ -15,8 +15,8 @@ inline int exponent(int base, int power)
 
 inline bool pointInRect(int x, int y, SDL_Rect rect)
 {
-    return x >= rect.x && x <= rect.x+rect.w &&
-	y >= rect.y && y <= rect.y+rect.h;
+    return x > rect.x && x < rect.x+rect.w &&
+	y > rect.y && y < rect.y+rect.h;
 }
 
 inline int convertStringToInt(char string[], int size)
