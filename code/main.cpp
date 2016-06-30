@@ -6,9 +6,18 @@
  * EditText changed to the next logical EditText
  * same with hitting Shift+TAB, it should make you select the previous text box
  *
- * have a "paint tool" and "fill tool" for drawing the tile maps
- * maybe also have a "copy tool" that allows you to copy sets of tiles and place them
- * somewhere else
+ * add tile set loading
+ *
+ * slice up all the tiles in the loaded tileset and layout them out so they don't go
+ * off screen
+ *
+ * add saving of tile maps to .js files
+ * (support saving to different formats as well?)
+ *
+ * add saving to arbitrary folders
+ *
+ * loading a tilemap
+ * (again in different formats)
  */
 
 #include <SDL.h>
@@ -23,6 +32,12 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 
+// TODO(denis): have a Button and a TextButton ?
+struct Button
+{
+    bool startedClick;
+    TexturedRect background;
+};
 
 struct Vec2
 {
@@ -47,6 +62,12 @@ struct TileMap
     int offsetX;
     int offsetY;
 };
+
+
+static bool buttonClicked(Button button, int mouseX, int mouseY)
+{
+    return pointInRect(mouseX, mouseY, button.background.pos);
+}
 
 static Vec2 convertScreenPosToTilePos(TileMap *tileMap, Vec2 pos)
 {
@@ -187,7 +208,7 @@ int main(int argc, char* argv[])
 	    int tileMapPadding = 30;
 	    
 	    char *tileSetFileName = "some_tiles.png";
-	    TexturedRect currentTileSet = {};
+	    Button currentTileSet = {};
 	    
 	    char *tileMapName = NULL;
 
@@ -257,8 +278,11 @@ int main(int argc, char* argv[])
 	    };
 	    Uint32 currentTool = FILL_TOOL;
 		
-	    TexturedRect paintToolIcon = loadImage(renderer, "paint-brush-icon-32.png");
-	    TexturedRect fillToolIcon = loadImage(renderer, "paint-can-icon-32.png");
+	    Button paintToolIcon = {};
+	    paintToolIcon.background = loadImage(renderer, "paint-brush-icon-32.png");
+
+	    Button fillToolIcon = {};
+	    fillToolIcon.background = loadImage(renderer, "paint-can-icon-32.png");
 		
 	    while (running)
 	    {
@@ -307,7 +331,7 @@ int main(int argc, char* argv[])
 
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
-				selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet);
+				selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet.background);
 
 				if (event.motion.state & SDL_BUTTON_LMASK)
 				{
@@ -323,7 +347,8 @@ int main(int argc, char* argv[])
 			    }
 			    else if (currentTool == FILL_TOOL && tileMap.tiles)
 			    {	
-				if (event.motion.state & SDL_BUTTON_LMASK)
+				if (event.motion.state & SDL_BUTTON_LMASK &&
+				    startSelectX != 0 && startSelectY != 0)
 				{
 				    //TODO(denis): make this if into a function?
 				    // or at least simplify it a bit
@@ -381,7 +406,7 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-				    selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet);
+				    selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet.background);
 				}
 			    }
 			} break;
@@ -390,6 +415,10 @@ int main(int argc, char* argv[])
 			{
 			    int x = event.button.x;
 			    int y = event.button.y;
+
+			    fillToolIcon.startedClick = buttonClicked(fillToolIcon, x, y);
+			    paintToolIcon.startedClick = buttonClicked(paintToolIcon, x, y);
+			    currentTileSet.startedClick = buttonClicked(currentTileSet, x, y);
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
@@ -421,6 +450,11 @@ int main(int argc, char* argv[])
 					selectionBox.pos.y = startSelectY;
 					selectionBox.pos.w = tileMap.tileSize;
 					selectionBox.pos.h = tileMap.tileSize;
+				    }
+				    else
+				    {
+					startSelectX = 0;
+					startSelectY = 0;
 				    }
 				}
 			    }
@@ -481,12 +515,12 @@ int main(int argc, char* argv[])
 					    row += tileMap.widthInTiles;
 					}
 
-					currentTileSet = loadImage(renderer,
+					currentTileSet.background = loadImage(renderer,
 								   tileSetFileName);
 
 					selectionBox = createFilledTexturedRect(
 					    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
-					selectionVisible = moveSelectionBox(&selectionBox, x, y, &tileMap, &currentTileSet);
+					selectionVisible = moveSelectionBox(&selectionBox, x, y, &tileMap, &currentTileSet.background);
 				    }
 				}
 				else
@@ -495,15 +529,17 @@ int main(int argc, char* argv[])
 				}
 			    }
 
-			    if (tileMap.tiles &&
-				     pointInRect(x, y, currentTileSet.pos))
+			    if (tileMap.tiles && buttonClicked(currentTileSet, x, y) &&
+				currentTileSet.startedClick)
 			    {
-				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.pos.x)/tileMap.tileSize * tileMap.tileSize;
-				selectedTile.pos.y = (selectionBox.pos.y - currentTileSet.pos.y)/tileMap.tileSize * tileMap.tileSize;
+				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.background.pos.x)/tileMap.tileSize * tileMap.tileSize;
+				selectedTile.pos.y = (selectionBox.pos.y - currentTileSet.background.pos.y)/tileMap.tileSize * tileMap.tileSize;
 				selectedTile.pos.w = tileMap.tileSize;
 				selectedTile.pos.h = tileMap.tileSize;
 				
-				selectedTile.image = currentTileSet.image;
+				selectedTile.image = currentTileSet.background.image;
+
+				currentTileSet.startedClick = false;
 			    }
 
 			    //NOTE(denis): changing between the tools
@@ -511,13 +547,17 @@ int main(int argc, char* argv[])
 			    {
 				//TODO(denis): implement a proper "radio button" type
 				// situation
-				if (pointInRect(x, y, paintToolIcon.pos))
+				if (buttonClicked(paintToolIcon, x, y) &&
+				    paintToolIcon.startedClick)
 				{
 				    currentTool = PAINT_TOOL;
+				    paintToolIcon.startedClick = false;
 				}
-				else if (pointInRect(x, y, fillToolIcon.pos))
+				else if (buttonClicked(fillToolIcon, x, y) &&
+					 fillToolIcon.startedClick)
 				{
 				    currentTool = FILL_TOOL;
+				    fillToolIcon.startedClick = false;
 				}
 			    }
 
@@ -528,8 +568,10 @@ int main(int argc, char* argv[])
 				{
 				    //TODO(denis): STILL BROKEN WHEN SELECTING
 				    // a new tile in the current tileset
-				    if (selectionVisible &&
-					!pointInRect(x, y, currentTileSet.pos))
+				    // the draw doesn't select the correct tile and
+				    // draws nothing
+				    if (selectionVisible && startSelectX != 0 &&
+					startSelectY != 0)
 				    {
 					Vec2 topLeft = {selectionBox.pos.x,
 							selectionBox.pos.y};
@@ -561,7 +603,7 @@ int main(int argc, char* argv[])
 				    }
 
 				    selectionVisible = moveSelectionBox(&selectionBox, x, y,
-									&tileMap, &currentTileSet);
+									&tileMap, &currentTileSet.background);
 				    selectionBox.pos.w = tileMap.tileSize;
 				    selectionBox.pos.h = tileMap.tileSize;
 				    
@@ -668,7 +710,7 @@ int main(int argc, char* argv[])
 		drawTextFields();
 		drawEditTexts();
 
-		if (currentTileSet.image != NULL)
+		if (currentTileSet.background.image != NULL)
 		{
 		    int tileMapBottom = tileMap.offsetY + tileMap.heightInTiles*tileMap.tileSize;
 		    int tileMapRight = tileMap.offsetX + tileMap.widthInTiles*tileMap.tileSize;
@@ -677,32 +719,32 @@ int main(int argc, char* argv[])
 		    {
 			//NOTE(denis): draw on right side
 			//TODO(denis): draw it centered on the right side
-			currentTileSet.pos.x = tileMapRight + 50;
-			currentTileSet.pos.y = 50;
+			currentTileSet.background.pos.x = tileMapRight + 50;
+			currentTileSet.background.pos.y = 50;
 
-			paintToolIcon.pos.x = tileMapRight + 10;
-			paintToolIcon.pos.y = 50;
+			paintToolIcon.background.pos.x = tileMapRight + 10;
+			paintToolIcon.background.pos.y = 50;
 
-			fillToolIcon.pos.x = tileMapRight + 10;
-			fillToolIcon.pos.y = 90;
+			fillToolIcon.background.pos.x = tileMapRight + 10;
+			fillToolIcon.background.pos.y = 90;
 		    }
 		    else if (tileMap.offsetY == tileMapPadding)
 		    {
                         //NOTE(denis): draw on bottom
 			//TODO(denis): draw it centered on the bottom
-			currentTileSet.pos.x = 50;
-			currentTileSet.pos.y = tileMapBottom + 50;
+			currentTileSet.background.pos.x = 50;
+			currentTileSet.background.pos.y = tileMapBottom + 50;
 			
-			paintToolIcon.pos.x = 50;
-			paintToolIcon.pos.y = tileMapBottom + 10;
+			paintToolIcon.background.pos.x = 50;
+			paintToolIcon.background.pos.y = tileMapBottom + 10;
 
-			fillToolIcon.pos.x = 90;
-			fillToolIcon.pos.y = tileMapBottom + 10;
+			fillToolIcon.background.pos.x = 90;
+			fillToolIcon.background.pos.y = tileMapBottom + 10;
 		    }
 
-		    SDL_RenderCopy(renderer, currentTileSet.image, NULL, &currentTileSet.pos);
-		    SDL_RenderCopy(renderer, paintToolIcon.image, NULL, &paintToolIcon.pos);
-		    SDL_RenderCopy(renderer, fillToolIcon.image, NULL, &fillToolIcon.pos);
+		    SDL_RenderCopy(renderer, currentTileSet.background.image, NULL, &currentTileSet.background.pos);
+		    SDL_RenderCopy(renderer, paintToolIcon.background.image, NULL, &paintToolIcon.background.pos);
+		    SDL_RenderCopy(renderer, fillToolIcon.background.image, NULL, &fillToolIcon.background.pos);
 		}
 		
 		if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
@@ -719,7 +761,7 @@ int main(int argc, char* argv[])
 				SDL_RenderCopy(renderer, defaultTile.image, NULL, &element->pos);
 			    }
 			    else
-				SDL_RenderCopy(renderer, currentTileSet.image, &element->sheetPos, &element->pos);
+				SDL_RenderCopy(renderer, currentTileSet.background.image, &element->sheetPos, &element->pos);
 
 			    ++element;
 			}
