@@ -46,6 +46,11 @@ bool initUI(SDL_Renderer *renderer, char *fileName, int fontSize)
     return result;
 }
 
+TTF_Font* getFont()
+{
+    return globalFont;
+}
+
 void destroyUI()
 {
     TTF_CloseFont(globalFont);
@@ -78,7 +83,7 @@ void deleteAllTextFields()
 }
 
 static void resetTextCursorPosition(EditText*);
-void uiHandleClicks(int mouseX, int mouseY, Uint8 button)
+void uiHandleClicks(Vector2 mouse, Uint8 button)
 {
     editTextSelected = false;
     
@@ -87,7 +92,7 @@ void uiHandleClicks(int mouseX, int mouseY, Uint8 button)
 	for (int i = 0; i < globalEditTextCount; i++)
 	{
 	    EditText *current = &globalEditTexts[i];
-	    if (pointInRect(mouseX, mouseY, current->pos))
+	    if (pointInRect(mouse, current->pos))
 	    {
 		current->selected = true;
 		resetTextCursorPosition(current);
@@ -126,7 +131,7 @@ static TexturedRect createNewTextField(char* text, int x, int y, SDL_Color colou
 
 
 //TODO(denis): have a setTextColour method instead of passing colours around?
-void addNewTextField(char *text, int x, int y, SDL_Color colour)
+TexturedRect addNewTextField(char *text, int x, int y, SDL_Color colour)
 {
     if (globalTextFieldCount < sizeof(globalTextFields)/sizeof(TexturedRect))
 	globalTextFields[globalTextFieldCount++] = createNewTextField(text, x, y, colour);
@@ -134,6 +139,8 @@ void addNewTextField(char *text, int x, int y, SDL_Color colour)
     {
 	//TODO(denis): increase the size and copy elements into new array
     }
+
+    return globalTextFields[globalTextFieldCount-1];
 }
 
 void drawTextFields()

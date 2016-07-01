@@ -25,6 +25,10 @@
 #include "SDL_image.h"
 #include "windows.h"
 #include <math.h>
+
+#include "main.h"
+#include "file_saving_loading.h"
+#include "denis_math.h"
 #include "UIElements.h"
 #include "TEMP_GeneralFunctions.cpp"
 
@@ -37,45 +41,59 @@ struct Button
 {
     bool startedClick;
     TexturedRect background;
+    
+    char *text;
+    TexturedRect foreground;
+
+    void setPosition(Vector2);
+    void destroy();
 };
-
-struct Vec2
+void Button::setPosition(Vector2 newPos)
 {
-    int x;
-    int y;
-};
+    this->background.pos.x = newPos.x;
+    this->background.pos.y = newPos.y;
 
-struct Tile
-{
-    SDL_Rect pos;
-    SDL_Rect sheetPos;
-};
-
-struct TileMap
-{
-    Tile *tiles;
-    int tileSize;
-    int widthInTiles;
-    int heightInTiles;
-
-    //TODO(denis): should this be in here?
-    int offsetX;
-    int offsetY;
-};
-
-
-static bool buttonClicked(Button button, int mouseX, int mouseY)
-{
-    return pointInRect(mouseX, mouseY, button.background.pos);
+    //TODO(denis): if centre/right/left aligned I would want to change this
+    this->foreground.pos.x = newPos.x;
+    this->foreground.pos.y = newPos.y;
 }
 
-static Vec2 convertScreenPosToTilePos(TileMap *tileMap, Vec2 pos)
+void Button::destroy()
 {
-    Vec2 result = {};
+    if (this->background.image)
+	SDL_DestroyTexture(this->background.image);
 
-    result.x = (pos.x - tileMap->offsetX)/tileMap->tileSize;
-    result.y = (pos.y - tileMap->offsetY)/tileMap->tileSize;
-    
+    if (this->foreground.image)
+    	SDL_DestroyTexture(this->foreground.image);
+
+    this->text = NULL;
+    this->startedClick = false;
+    this->background = {};
+    this->foreground = {};
+}
+
+static void draw(SDL_Renderer *renderer, Button *button)
+{
+    if (button->background.image)
+	SDL_RenderCopy(renderer, button->background.image, NULL, &button->background.pos);
+
+    if (button->text && button->foreground.image)
+    {
+	SDL_RenderCopy(renderer, button->foreground.image, NULL, &button->foreground.pos);
+    }
+}
+
+static bool buttonClicked(Button button, Vector2 mouse)
+{
+    return pointInRect(mouse, button.background.pos);
+}
+
+static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
+{
+    Vector2 result = {};
+
+    result = (pos - tileMap->offset)/tileMap->tileSize;
+     
     return result;
 }
 
@@ -91,26 +109,30 @@ static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
     return result;
 }
 
-static bool moveSelectionBox(TexturedRect *selectionBox, Sint32 mouseX, Sint32 mouseY,
+static bool moveSelectionBox(TexturedRect *selectionBox, Vector2 mouse,
 			     TileMap *tileMap, TexturedRect *otherArea)
 {
     bool shouldBeDrawn = true;
     
     if (selectionBox->image != NULL)
-    {
-	Uint32 tileMapStartX = tileMap->tiles->pos.x;
-	Uint32 tileMapStartY = tileMap->tiles->pos.y;
+    {	
 	Uint32 tileSize = tileMap->tileSize;
 
-	if (pointInRect(mouseX, mouseY, {tileMapStartX, tileMapStartY, tileMap->widthInTiles*tileSize, tileMap->heightInTiles*tileSize}))
+	if (pointInRect(mouse, tileMap->getRect()))
 	{
-	    selectionBox->pos.x = ((mouseX-tileMapStartX)/tileSize) * tileSize + tileMapStartX;
-	    selectionBox->pos.y = ((mouseY-tileMapStartY)/tileSize) * tileSize + tileMapStartY;
+	    Vector2 newPos = ((mouse - tileMap->offset)/tileSize) * tileSize + tileMap->offset;
+	    selectionBox->pos.x = newPos.x;
+	    selectionBox->pos.y = newPos.y;
 	}
-	else if (pointInRect(mouseX, mouseY, otherArea->pos))
+	else if (pointInRect(mouse, otherArea->pos))
 	{
-	    selectionBox->pos.x = ((mouseX-otherArea->pos.x)/tileMap->tileSize) * tileMap->tileSize + otherArea->pos.x;
-	    selectionBox->pos.y = ((mouseY-otherArea->pos.y)/tileMap->tileSize) * tileMap->tileSize + otherArea->pos.y;
+	    Vector2 otherPos = {otherArea->pos.x, otherArea->pos.y};
+
+	    //TODO(denis): this seems dumb
+	    // get rid of / tileSize * tileSize
+	    Vector2 newPos = (mouse - otherPos)/tileSize * tileSize + otherPos;
+	    selectionBox->pos.x = newPos.x;
+	    selectionBox->pos.y = newPos.y;
 	}
 	else
 	    shouldBeDrawn = false;
@@ -131,13 +153,13 @@ static void reorientEditingArea(SDL_Window *window, TileMap *tileMap, int paddin
 
     if (widthSpace > heightSpace)
     {
-        tileMap->offsetX = padding;
-        tileMap->offsetY = windowHeight/2 - tileMap->tileSize*tileMap->heightInTiles/2;
+	int offsetY = windowHeight/2 - tileMap->tileSize*tileMap->heightInTiles/2;
+	tileMap->offset = {padding, offsetY};
     }
     else
     {
-	tileMap->offsetY = padding;
-        tileMap->offsetX = windowWidth/2 - tileMap->tileSize*tileMap->widthInTiles/2;
+        int offsetX = windowWidth/2 - tileMap->tileSize*tileMap->widthInTiles/2;
+	tileMap->offset = {offsetX, padding};
     }
 }
 
@@ -159,6 +181,41 @@ static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
     SDL_GetClipRect(rectangle, &result.pos);
     SDL_FreeSurface(rectangle);
 
+    return result;
+}
+
+//TODO(denis): perhaps have multiple versions that do a different kind of
+// TTF_RenderText, like Shaded and Solid
+static TexturedRect createNewTextField(SDL_Renderer* renderer,
+				       char* text, int x, int y, SDL_Color colour)
+{
+    TexturedRect result = {};
+    
+    SDL_Surface* tempSurf = TTF_RenderText_Blended(getFont(), text, colour);
+
+    SDL_GetClipRect(tempSurf, &result.pos);
+    result.pos.x = x;
+    result.pos.y = y;
+
+    result.image = SDL_CreateTextureFromSurface(renderer, tempSurf);
+    SDL_FreeSurface(tempSurf);
+
+    return result;
+}
+
+static Button createNewTextButton(SDL_Renderer *renderer,
+				  char *text, SDL_Colour textColour,
+				  int width, int height, Uint32 backgroundColour)
+{
+    Button result = {};
+
+    result.text = text;
+    result.background = createFilledTexturedRect(renderer, width, height, backgroundColour);
+
+    //TODO(denis): add options for left align, centre aligned, and right aligned text
+    result.foreground = createNewTextField(renderer, text, result.background.pos.x,
+					result.background.pos.y, textColour);
+    
     return result;
 }
 
@@ -204,7 +261,7 @@ int main(int argc, char* argv[])
 	{
 	    bool running = true;
 	    
-	    //TODO(denis): where is this used?
+	    //TODO(denis): i don't like this loose variable here
 	    int tileMapPadding = 30;
 	    
 	    char *tileSetFileName = "some_tiles.png";
@@ -213,12 +270,10 @@ int main(int argc, char* argv[])
 	    char *tileMapName = NULL;
 
 	    TileMap tileMap = {};
-	    tileMap.offsetX = 5;
-	    tileMap.offsetY = 5;
+	    tileMap.offset = {5, 5};
 
 	    bool selectionVisible = false;
-	    Uint32 startSelectX = 0;
-	    Uint32 startSelectY = 0;
+	    Vector2 startSelectPos = {};
 	    TexturedRect selectionBox = {};
 	    TexturedRect selectedTile = {};
 
@@ -264,15 +319,15 @@ int main(int argc, char* argv[])
 	    EditText *heightTextTiles = getEditTextByID(HEIGHT_TEXT_TILES);
 	    heightTextTiles->allowedCharacters = numberChars;
 
+	    Button newTileMapButton =
+		createNewTextButton(renderer, "Create New Map", COLOUR_WHITE,
+				    200, 100, 0xFFFF0000);
+	    newTileMapButton.setPosition({500, 500});
 	    bool buttonVisible = true;
-	    TexturedRect createNewButton =
-		createFilledTexturedRect(renderer, 200, 100, 0xFFFF0000);
-	    createNewButton.pos.x = 500;
-	    createNewButton.pos.y = 500;
-	    addNewTextField("Create New Map", createNewButton.pos.x + 20,
-			    createNewButton.pos.y + createNewButton.pos.h/2,
-			    COLOUR_WHITE);
 
+	    
+	    Button saveButton = {};
+	    
 	    const enum { PAINT_TOOL,
 		   FILL_TOOL
 	    };
@@ -310,8 +365,8 @@ int main(int argc, char* argv[])
 					Tile *element = row;
 					for (int j = 0; j < tileMap.widthInTiles; ++j)
 					{
-					    element->pos.x = tileMap.offsetX + j*tileMap.tileSize;
-					    element->pos.y = tileMap.offsetY + i*tileMap.tileSize;
+					    element->pos.x = tileMap.offset.x + j*tileMap.tileSize;
+					    element->pos.y = tileMap.offset.y + i*tileMap.tileSize;
 					    ++element;
 					}
 					row += tileMap.widthInTiles;
@@ -325,22 +380,21 @@ int main(int argc, char* argv[])
 			{
 			    //TODO(denis): also handle when the user has focus on our
 			    // window but has moved off of it
-			    
-			    Sint32 mouseX = event.motion.x;
-			    Sint32 mouseY = event.motion.y;
 
+			    Vector2 mouse = {event.motion.x, event.motion.y};
+			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
-				selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet.background);
+				selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
 
 				if (event.motion.state & SDL_BUTTON_LMASK)
 				{
-				    if (pointInRect(mouseX, mouseY, {tileMap.offsetX, tileMap.offsetY, tileMap.tileSize*tileMap.widthInTiles, tileMap.tileSize*tileMap.heightInTiles}))
+				    if (pointInRect(mouse, tileMap.getRect()))
 				    {
-					int tileX = (mouseX-tileMap.offsetX)/tileMap.tileSize;
-					int tileY = (mouseY-tileMap.offsetY)/tileMap.tileSize;
+					Vector2 tile =
+					    (mouse - tileMap.offset)/tileMap.tileSize;
 
-					Tile *clicked = tileMap.tiles + tileX + tileY*tileMap.widthInTiles;
+					Tile *clicked = tileMap.tiles + tile.x + tile.y*tileMap.widthInTiles;
 					clicked->sheetPos = selectedTile.pos;
 				    }
 				}
@@ -348,22 +402,20 @@ int main(int argc, char* argv[])
 			    else if (currentTool == FILL_TOOL && tileMap.tiles)
 			    {	
 				if (event.motion.state & SDL_BUTTON_LMASK &&
-				    startSelectX != 0 && startSelectY != 0)
+				    startSelectPos != Vector2{0,0})
 				{
 				    //TODO(denis): make this if into a function?
 				    // or at least simplify it a bit
-				    if (mouseX < tileMap.offsetX)
+				    if (mouse.x < tileMap.offset.x)
 					int x = 0;
-				    if (mouseY < tileMap.offsetY)
+				    if (mouse.y < tileMap.offset.y)
 					int y = 0;
 				    
-				    Vec2 temp = {mouseX, mouseY};
-				    Vec2 tilePos =
-					convertScreenPosToTilePos(&tileMap, temp);
+				    Vector2 tilePos =
+					convertScreenPosToTilePos(&tileMap, mouse);
 
-				    temp = {startSelectX, startSelectY};
-				    Vec2 startedTilePos =
-					convertScreenPosToTilePos(&tileMap, temp);
+				    Vector2 startedTilePos =
+					convertScreenPosToTilePos(&tileMap, startSelectPos);
 
 				    if (tilePos.x < 0)
 					tilePos.x = 0;
@@ -375,59 +427,50 @@ int main(int argc, char* argv[])
 				    else if (tilePos.y >= tileMap.heightInTiles)
 					tilePos.y = tileMap.heightInTiles-1;
 				    
-				    
-				    if (startedTilePos.x < tilePos.x)
-				    {
-					//TODO(denis): I do this same sort of calculation all the time
-					// gotta be a better way
-					selectionBox.pos.x = tileMap.offsetX + startedTilePos.x*tileMap.tileSize;
-					selectionBox.pos.w = tileMap.tileSize + (tilePos.x - startedTilePos.x)*tileMap.tileSize;
-				    }
-				    else
-				    {
-					selectionBox.pos.x = tileMap.offsetX + tilePos.x*tileMap.tileSize;
-					//TODO(denis): having some sort of absolute value function/macro would
-					// simplify this
-					selectionBox.pos.w = tileMap.tileSize + (startedTilePos.x - tilePos.x)*tileMap.tileSize;
-				    }
 
+				    //TODO(denis): I do this same sort of calculation all the time
+				    // gotta be a better way
+				    if (startedTilePos.x < tilePos.x)
+					selectionBox.pos.x = tileMap.offset.x + startedTilePos.x*tileMap.tileSize;
+					
+				    else
+					selectionBox.pos.x = tileMap.offset.x + tilePos.x*tileMap.tileSize;
+				    
+				    selectionBox.pos.w = tileMap.tileSize + absValue(tilePos.x - startedTilePos.x)*tileMap.tileSize;
+				    
 
 				    if (startedTilePos.y < tilePos.y)
-				    {
-					selectionBox.pos.y = tileMap.offsetY + startedTilePos.y*tileMap.tileSize;
-					selectionBox.pos.h = tileMap.tileSize + (tilePos.y - startedTilePos.y)*tileMap.tileSize;
-				    }
+					selectionBox.pos.y = tileMap.offset.y + startedTilePos.y*tileMap.tileSize;
 				    else
-				    {
-					selectionBox.pos.y = tileMap.offsetY + tilePos.y*tileMap.tileSize;
-					selectionBox.pos.h = tileMap.tileSize + (startedTilePos.y - tilePos.y)*tileMap.tileSize;
-				    }
+					selectionBox.pos.y = tileMap.offset.y + tilePos.y*tileMap.tileSize;
+
+				    selectionBox.pos.h = tileMap.tileSize + absValue(tilePos.y - startedTilePos.y)*tileMap.tileSize;
 				    
 				}
 				else
 				{
-				    selectionVisible = moveSelectionBox(&selectionBox, mouseX, mouseY, &tileMap, &currentTileSet.background);
+				    selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
 				}
 			    }
 			} break;
 
 			case SDL_MOUSEBUTTONDOWN:
 			{
-			    int x = event.button.x;
-			    int y = event.button.y;
+			    Vector2 mouse = {event.button.x, event.button.y};
 
-			    fillToolIcon.startedClick = buttonClicked(fillToolIcon, x, y);
-			    paintToolIcon.startedClick = buttonClicked(paintToolIcon, x, y);
-			    currentTileSet.startedClick = buttonClicked(currentTileSet, x, y);
+			    fillToolIcon.startedClick = buttonClicked(fillToolIcon, mouse);
+			    paintToolIcon.startedClick = buttonClicked(paintToolIcon, mouse);
+			    currentTileSet.startedClick = buttonClicked(currentTileSet, mouse);
+			    saveButton.startedClick = buttonClicked(saveButton, mouse);
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{			    
-				    if (pointInRect(x, y, {tileMap.offsetX, tileMap.offsetY, tileMap.tileSize*tileMap.widthInTiles, tileMap.tileSize*tileMap.heightInTiles}))
+				    if (pointInRect(mouse, tileMap.getRect()))
 				    {
-					Vec2 tilePos =
-					    convertScreenPosToTilePos(&tileMap, {x,y});
+					Vector2 tilePos =
+					    convertScreenPosToTilePos(&tileMap, mouse);
 
 					Tile *clicked = tileMap.tiles + tilePos.x + tilePos.y*tileMap.widthInTiles;
 					clicked->sheetPos = selectedTile.pos;
@@ -438,23 +481,21 @@ int main(int argc, char* argv[])
 			    {
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{
-				    if (pointInRect(x, y, {tileMap.offsetX, tileMap.offsetY, tileMap.tileSize*tileMap.widthInTiles, tileMap.tileSize*tileMap.heightInTiles}))
+				    if (pointInRect(mouse, tileMap.getRect()))
 				    {
-					Vec2 tilePos =
-					    convertScreenPosToTilePos(&tileMap, {x,y});
+					Vector2 tilePos =
+					    convertScreenPosToTilePos(&tileMap, mouse);
 
-					startSelectX = tileMap.offsetX + tilePos.x*tileMap.tileSize;
-					startSelectY = tileMap.offsetY + tilePos.y*tileMap.tileSize;
+					startSelectPos = tileMap.offset + tilePos*tileMap.tileSize;
 					
-					selectionBox.pos.x = startSelectX;
-					selectionBox.pos.y = startSelectY;
+					selectionBox.pos.x = startSelectPos.x;
+					selectionBox.pos.y = startSelectPos.y;
 					selectionBox.pos.w = tileMap.tileSize;
 					selectionBox.pos.h = tileMap.tileSize;
 				    }
 				    else
 				    {
-					startSelectX = 0;
-					startSelectY = 0;
+					startSelectPos = {0, 0};
 				    }
 				}
 			    }
@@ -462,12 +503,11 @@ int main(int argc, char* argv[])
 			
 			case SDL_MOUSEBUTTONUP:
 			{
-			    int x = event.button.x;
-			    int y = event.button.y;
+			    Vector2 mouse = {event.button.x, event.button.y};
 
-			    uiHandleClicks(x, y, event.button.button);
-
-			    if (pointInRect(x, y, createNewButton.pos))
+			    uiHandleClicks(mouse, event.button.button);
+			    
+			    if (pointInRect(mouse, newTileMapButton.background.pos))
 			    {
 				EditText *nameText = getEditTextByID(MAP_NAME_TEXT);
 				tileMapName = nameText->text;
@@ -482,10 +522,8 @@ int main(int argc, char* argv[])
 				    deleteAllEditTexts();
 				    deleteAllTextFields();
 				    buttonVisible = false;
-				    createNewButton.pos = {};
-				    SDL_DestroyTexture(createNewButton.image);
-				    createNewButton.image = NULL;
-
+				    newTileMapButton.destroy();
+				    
 				    int memorySize = sizeof(Tile)*tileMap.widthInTiles*tileMap.heightInTiles;
 				    
 				    HANDLE heapHandle = GetProcessHeap();
@@ -505,8 +543,8 @@ int main(int argc, char* argv[])
 						
 						rect.h = tileMap.tileSize;
 						rect.w = tileMap.tileSize;
-						rect.x = tileMap.offsetX + j*tileMap.tileSize;
-						rect.y = tileMap.offsetY + i*tileMap.tileSize;
+						rect.x = tileMap.offset.x + j*tileMap.tileSize;
+						rect.y = tileMap.offset.y + i*tileMap.tileSize;
 						
 						element->pos = rect;
 
@@ -520,7 +558,10 @@ int main(int argc, char* argv[])
 
 					selectionBox = createFilledTexturedRect(
 					    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
-					selectionVisible = moveSelectionBox(&selectionBox, x, y, &tileMap, &currentTileSet.background);
+					selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
+
+					saveButton = createNewTextButton(renderer, "Save", COLOUR_WHITE,
+						    100, 50, 0xFF33AA88);
 				    }
 				}
 				else
@@ -529,7 +570,7 @@ int main(int argc, char* argv[])
 				}
 			    }
 
-			    if (tileMap.tiles && buttonClicked(currentTileSet, x, y) &&
+			    if (tileMap.tiles && buttonClicked(currentTileSet, mouse) &&
 				currentTileSet.startedClick)
 			    {
 				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.background.pos.x)/tileMap.tileSize * tileMap.tileSize;
@@ -542,18 +583,29 @@ int main(int argc, char* argv[])
 				currentTileSet.startedClick = false;
 			    }
 
+			    //NOTE(denis): hit the save button
+			    if (tileMap.tiles && saveButton.startedClick)
+			    {
+				OutputDebugStringA("you have saved the data\n");
+
+				//TODO(denis): actually save data
+				saveTileMapToFile(&tileMap, tileMapName);
+				
+				saveButton.startedClick = false;
+			    }
+			    
 			    //NOTE(denis): changing between the tools
 			    if (tileMap.tiles)
 			    {
 				//TODO(denis): implement a proper "radio button" type
 				// situation
-				if (buttonClicked(paintToolIcon, x, y) &&
+				if (buttonClicked(paintToolIcon, mouse) &&
 				    paintToolIcon.startedClick)
 				{
 				    currentTool = PAINT_TOOL;
 				    paintToolIcon.startedClick = false;
 				}
-				else if (buttonClicked(fillToolIcon, x, y) &&
+				else if (buttonClicked(fillToolIcon, mouse) &&
 					 fillToolIcon.startedClick)
 				{
 				    currentTool = FILL_TOOL;
@@ -570,18 +622,18 @@ int main(int argc, char* argv[])
 				    // a new tile in the current tileset
 				    // the draw doesn't select the correct tile and
 				    // draws nothing
-				    if (selectionVisible && startSelectX != 0 &&
-					startSelectY != 0)
+				    if (selectionVisible &&
+					startSelectPos != Vector2{0,0})
 				    {
-					Vec2 topLeft = {selectionBox.pos.x,
+					Vector2 topLeft = {selectionBox.pos.x,
 							selectionBox.pos.y};
 				    
-					Vec2 botRight = {selectionBox.pos.x+selectionBox.pos.w,
+					Vector2 botRight = {selectionBox.pos.x+selectionBox.pos.w,
 							 selectionBox.pos.y+selectionBox.pos.h};
 				    
-					Vec2 startTile =
+					Vector2 startTile =
 					    convertScreenPosToTilePos(&tileMap, topLeft);
-					Vec2 endTile =
+					Vector2 endTile =
 					    convertScreenPosToTilePos(&tileMap, botRight);
 
 					if (endTile.x > tileMap.widthInTiles)
@@ -602,7 +654,7 @@ int main(int argc, char* argv[])
 					}
 				    }
 
-				    selectionVisible = moveSelectionBox(&selectionBox, x, y,
+				    selectionVisible = moveSelectionBox(&selectionBox, mouse,
 									&tileMap, &currentTileSet.background);
 				    selectionBox.pos.w = tileMap.tileSize;
 				    selectionBox.pos.h = tileMap.tileSize;
@@ -705,22 +757,30 @@ int main(int argc, char* argv[])
 		SDL_RenderClear(renderer);
 
 		if (buttonVisible)
-		    SDL_RenderCopy(renderer, createNewButton.image, NULL, &createNewButton.pos);
+		{
+		    draw(renderer, &newTileMapButton);
+		}
+		
+		draw(renderer, &saveButton);
 
 		drawTextFields();
 		drawEditTexts();
 
 		if (currentTileSet.background.image != NULL)
 		{
-		    int tileMapBottom = tileMap.offsetY + tileMap.heightInTiles*tileMap.tileSize;
-		    int tileMapRight = tileMap.offsetX + tileMap.widthInTiles*tileMap.tileSize;
+		    int tileMapBottom = tileMap.offset.y + tileMap.heightInTiles*tileMap.tileSize;
+		    int tileMapRight = tileMap.offset.x + tileMap.widthInTiles*tileMap.tileSize;
 		    
-		    if (tileMap.offsetX == tileMapPadding)
+		    if (tileMap.offset.x == tileMapPadding)
 		    {
 			//NOTE(denis): draw on right side
 			//TODO(denis): draw it centered on the right side
 			currentTileSet.background.pos.x = tileMapRight + 50;
 			currentTileSet.background.pos.y = 50;
+
+			Vector2 temp = {currentTileSet.background.pos.x + 20,
+					currentTileSet.background.pos.y + 100};
+			saveButton.setPosition(temp);
 
 			paintToolIcon.background.pos.x = tileMapRight + 10;
 			paintToolIcon.background.pos.y = 50;
@@ -728,7 +788,7 @@ int main(int argc, char* argv[])
 			fillToolIcon.background.pos.x = tileMapRight + 10;
 			fillToolIcon.background.pos.y = 90;
 		    }
-		    else if (tileMap.offsetY == tileMapPadding)
+		    else if (tileMap.offset.y == tileMapPadding)
 		    {
                         //NOTE(denis): draw on bottom
 			//TODO(denis): draw it centered on the bottom

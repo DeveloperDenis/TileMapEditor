@@ -1,4 +1,5 @@
 #include "SDL_rect.h"
+#include "denis_math.h"
 
 //TODO(denis): there is a faster way I'm pretty sure
 inline int exponent(int base, int power)
@@ -13,10 +14,10 @@ inline int exponent(int base, int power)
     return result;
 }
 
-inline bool pointInRect(int x, int y, SDL_Rect rect)
+inline bool pointInRect(Vector2 point, SDL_Rect rect)
 {
-    return x > rect.x && x < rect.x+rect.w &&
-	y > rect.y && y < rect.y+rect.h;
+    return point.x > rect.x && point.x < rect.x+rect.w &&
+	point.y > rect.y && point.y < rect.y+rect.h;
 }
 
 inline int convertStringToInt(char string[], int size)

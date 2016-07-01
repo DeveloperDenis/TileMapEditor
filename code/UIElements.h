@@ -1,6 +1,8 @@
 #ifndef UIELEMENTS_H_
 #define UIELEMENTS_H_
 
+//TODO(denis): this separation was premature and before I even knew what I needed
+
 struct TextCursor
 {
     SDL_Rect pos;
@@ -34,7 +36,9 @@ struct EditText
 bool initUI(SDL_Renderer *renderer, char *fontName, int fontSize);
 void destroyUI();
 
-void addNewTextField(char *text, int x, int y, SDL_Color colour);
+TTF_Font* getFont();
+
+TexturedRect addNewTextField(char *text, int x, int y, SDL_Color colour);
 void drawTextFields();
 
 void addNewEditText(int x, int y, int width, int height, SDL_Color bgColor,
@@ -53,7 +57,8 @@ EditText *getSelectedEditText();
 void deleteAllEditTexts();
 void deleteAllTextFields();
 
-void uiHandleClicks(int mouseX, int mouseY, Uint8 button);
+struct Vector2;
+void uiHandleClicks(Vector2 mouse, Uint8 button);
 
 const SDL_Color COLOUR_WHITE = {255,255,255,255};
 const SDL_Color COLOUR_BLACK = {0,0,0,255};
