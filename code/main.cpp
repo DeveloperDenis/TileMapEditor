@@ -29,59 +29,13 @@
 #include "main.h"
 #include "file_saving_loading.h"
 #include "denis_math.h"
-#include "UIElements.h"
 #include "TEMP_GeneralFunctions.cpp"
+
+#include "ui_elements.h"
 
 #define TITLE "Tile Map Editor"
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
-
-// TODO(denis): have a Button and a TextButton ?
-struct Button
-{
-    bool startedClick;
-    TexturedRect background;
-    
-    char *text;
-    TexturedRect foreground;
-
-    void setPosition(Vector2);
-    void destroy();
-};
-void Button::setPosition(Vector2 newPos)
-{
-    this->background.pos.x = newPos.x;
-    this->background.pos.y = newPos.y;
-
-    //TODO(denis): if centre/right/left aligned I would want to change this
-    this->foreground.pos.x = newPos.x;
-    this->foreground.pos.y = newPos.y;
-}
-
-void Button::destroy()
-{
-    if (this->background.image)
-	SDL_DestroyTexture(this->background.image);
-
-    if (this->foreground.image)
-    	SDL_DestroyTexture(this->foreground.image);
-
-    this->text = NULL;
-    this->startedClick = false;
-    this->background = {};
-    this->foreground = {};
-}
-
-static void draw(SDL_Renderer *renderer, Button *button)
-{
-    if (button->background.image)
-	SDL_RenderCopy(renderer, button->background.image, NULL, &button->background.pos);
-
-    if (button->text && button->foreground.image)
-    {
-	SDL_RenderCopy(renderer, button->foreground.image, NULL, &button->foreground.pos);
-    }
-}
 
 static bool buttonClicked(Button button, Vector2 mouse)
 {
@@ -184,25 +138,6 @@ static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
     return result;
 }
 
-//TODO(denis): perhaps have multiple versions that do a different kind of
-// TTF_RenderText, like Shaded and Solid
-static TexturedRect createNewTextField(SDL_Renderer* renderer,
-				       char* text, int x, int y, SDL_Color colour)
-{
-    TexturedRect result = {};
-    
-    SDL_Surface* tempSurf = TTF_RenderText_Blended(getFont(), text, colour);
-
-    SDL_GetClipRect(tempSurf, &result.pos);
-    result.pos.x = x;
-    result.pos.y = y;
-
-    result.image = SDL_CreateTextureFromSurface(renderer, tempSurf);
-    SDL_FreeSurface(tempSurf);
-
-    return result;
-}
-
 static Button createNewTextButton(SDL_Renderer *renderer,
 				  char *text, SDL_Colour textColour,
 				  int width, int height, Uint32 backgroundColour)
@@ -213,7 +148,7 @@ static Button createNewTextButton(SDL_Renderer *renderer,
     result.background = createFilledTexturedRect(renderer, width, height, backgroundColour);
 
     //TODO(denis): add options for left align, centre aligned, and right aligned text
-    result.foreground = createNewTextField(renderer, text, result.background.pos.x,
+    result.foreground = ui_createTextField(text, result.background.pos.x,
 					result.background.pos.y, textColour);
     
     return result;
@@ -223,10 +158,11 @@ static void fillBWithAConverted(float conversionFactor, EditText *A, EditText *B
 {
     int numberA = convertStringToInt(A->text, A->letterCount);
     int numberB = (int)(numberA*conversionFactor);
-    
-    while (B->letterCount > 0)
-	editTextEraseLetter(B);
 
+    while (B->letterCount > 0)
+        ui_eraseLetter(B);
+
+    
     int digitsB = 0;
     int tempB = numberB;
     while (tempB > 0)
@@ -239,7 +175,7 @@ static void fillBWithAConverted(float conversionFactor, EditText *A, EditText *B
     {
 	//TODO(denis): this calculation is probably pretty inefficient
 	char letter = (char)(numberB % exponent(10, digitsB-i) / exponent(10, digitsB-i-1)) + '0';
-	editTextAddLetter(B, letter, COLOUR_BLACK);
+	ui_addLetterTo(B, letter);
     }
 }
 
@@ -250,13 +186,16 @@ int main(int argc, char* argv[])
     SDL_Window *window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED,
 					  SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
 					  WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
-        
+
+    char *fontFileName = "LiberationMono-Regular.ttf";
+    int fontSize = 16;
+    
     if (window)
     {
 	//TODO(denis): maybe add renderer flags?
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 
-	if (renderer && initUI(renderer, "LiberationMono-Regular.ttf", 16)
+	if (renderer && ui_init(renderer, fontFileName, fontSize)
 	    && IMG_Init(IMG_INIT_PNG) != 0)
 	{
 	    bool running = true;
@@ -277,48 +216,61 @@ int main(int argc, char* argv[])
 	    TexturedRect selectionBox = {};
 	    TexturedRect selectedTile = {};
 
-	    const enum {
-		MAP_NAME_TEXT,
-		TILE_SIZE_TEXT,
-		WIDTH_TEXT_PX,
-		WIDTH_TEXT_TILES,
-		HEIGHT_TEXT_PX,
-		HEIGHT_TEXT_TILES
-	    };
+	    TexturedRect tileMapNameText =
+		ui_createTextField("Tile Map Name: ", 100, 100, COLOUR_WHITE);
 
-	    addNewTextField("Tile Map Name: ", 100, 100, COLOUR_WHITE);
-	    addNewTextField("Tile Size: ", 100, 150, COLOUR_WHITE);
-	    addNewTextField("Width: ", 100, 200, COLOUR_WHITE);
-	    addNewTextField("pixels", 455, 200, COLOUR_WHITE);
-	    addNewTextField("tiles", 760, 200, COLOUR_WHITE);
-	    addNewTextField("Height: ", 100, 250, COLOUR_WHITE);
-	    addNewTextField("pixels", 455, 250, COLOUR_WHITE);
-	    addNewTextField("tiles", 760, 250, COLOUR_WHITE);
+	    TexturedRect tileSizeText =
+		ui_createTextField("Tile Size: ", 100, 150, COLOUR_WHITE);
 
-	    addNewEditText(250, 100, 200, 20, COLOUR_WHITE, 2, MAP_NAME_TEXT);
-	    addNewEditText(250, 150, 200, 20, COLOUR_WHITE,  2, TILE_SIZE_TEXT);
-	    addNewEditText(250, 200, 200, 20, COLOUR_WHITE, 2, WIDTH_TEXT_PX);
-	    addNewEditText(550, 200, 200, 20, COLOUR_WHITE, 2, WIDTH_TEXT_TILES);
-	    addNewEditText(250, 250, 200, 20, COLOUR_WHITE, 2, HEIGHT_TEXT_PX);
-	    addNewEditText(550, 250, 200, 20, COLOUR_WHITE, 2, HEIGHT_TEXT_TILES);
+	    TexturedRect widthText =
+		ui_createTextField("Width: ", 100, 200, COLOUR_WHITE);
+
+	    TexturedRect pixelsText =
+		ui_createTextField("pixels", 455, 200, COLOUR_WHITE);
+
+	    TexturedRect tilesText =
+		ui_createTextField("tiles", 760, 200, COLOUR_WHITE);
+
+	    TexturedRect heightText =
+		ui_createTextField("Height: ", 100, 250, COLOUR_WHITE);
+
+	    TexturedRect pixelsText2 =
+		ui_createTextField("pixels", 455, 250, COLOUR_WHITE);
+
+	    TexturedRect tilesText2 =
+		ui_createTextField("tiles", 760, 250, COLOUR_WHITE);
 	    
 	    char numberChars[] =  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0};
+
+	    EditText tileMapNameEditText =
+		ui_createEditText(250, 100, 200, 20, COLOUR_WHITE, 2);
+	    ui_addToGroup(&tileMapNameEditText);
 	    
-	    EditText *tileSizeText = getEditTextByID(TILE_SIZE_TEXT);
-	    tileSizeText->allowedCharacters = numberChars;
-
-	    EditText *widthTextPx = getEditTextByID(WIDTH_TEXT_PX);
-	    widthTextPx->allowedCharacters = numberChars;
-
-	    EditText *widthTextTiles = getEditTextByID(WIDTH_TEXT_TILES);
-	    widthTextTiles->allowedCharacters = numberChars;
-
-	    EditText *heightTextPx = getEditTextByID(HEIGHT_TEXT_PX);
-	    heightTextPx->allowedCharacters = numberChars;
+	    EditText tileSizeEditText =
+		ui_createEditText(250, 150, 200, 20, COLOUR_WHITE, 2);
+	    tileSizeEditText.allowedCharacters = numberChars;
+	    ui_addToGroup(&tileSizeEditText);
 	    
-	    EditText *heightTextTiles = getEditTextByID(HEIGHT_TEXT_TILES);
-	    heightTextTiles->allowedCharacters = numberChars;
-
+	    EditText widthPxEditText =
+		ui_createEditText(250, 200, 200, 20, COLOUR_WHITE,  2);
+	    widthPxEditText.allowedCharacters = numberChars;
+	    ui_addToGroup(&widthPxEditText);
+	    
+	    EditText widthTilesEditText =
+		ui_createEditText(550, 200, 200, 20, COLOUR_WHITE, 2);
+	    widthTilesEditText.allowedCharacters = numberChars;
+	    ui_addToGroup(&widthTilesEditText);
+	    
+	    EditText heightPxEditText =
+		ui_createEditText(250, 250, 200, 20, COLOUR_WHITE, 2);
+	    heightPxEditText.allowedCharacters = numberChars;
+	    ui_addToGroup(&heightPxEditText);
+	    
+	    EditText heightTilesEditText =
+		ui_createEditText(550, 250, 200, 20, COLOUR_WHITE, 2);
+	    heightTilesEditText.allowedCharacters = numberChars;
+	    ui_addToGroup(&heightTilesEditText);
+	    
 	    Button newTileMapButton =
 		createNewTextButton(renderer, "Create New Map", COLOUR_WHITE,
 				    200, 100, 0xFFFF0000);
@@ -458,6 +410,9 @@ int main(int argc, char* argv[])
 			{
 			    Vector2 mouse = {event.button.x, event.button.y};
 
+			    ui_processMouseDown(mouse, event.button.button);
+			    
+			    //TODO(denis): replace this with the ui call
 			    fillToolIcon.startedClick = buttonClicked(fillToolIcon, mouse);
 			    paintToolIcon.startedClick = buttonClicked(paintToolIcon, mouse);
 			    currentTileSet.startedClick = buttonClicked(currentTileSet, mouse);
@@ -505,22 +460,30 @@ int main(int argc, char* argv[])
 			{
 			    Vector2 mouse = {event.button.x, event.button.y};
 
-			    uiHandleClicks(mouse, event.button.button);
+			    ui_processMouseUp(mouse, event.button.button);
 			    
 			    if (pointInRect(mouse, newTileMapButton.background.pos))
 			    {
-				EditText *nameText = getEditTextByID(MAP_NAME_TEXT);
-				tileMapName = nameText->text;
+				tileMapName = tileMapNameEditText.text;
 
-				tileMap.tileSize = (Uint32)convertStringToInt(tileSizeText->text, tileSizeText->letterCount);
-			        tileMap.widthInTiles = (Uint32)convertStringToInt(widthTextTiles->text, widthTextTiles->letterCount);
-				tileMap.heightInTiles = (Uint32)convertStringToInt(heightTextTiles->text, heightTextTiles->letterCount);
-
+				tileMap.tileSize = (Uint32)convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
+			        tileMap.widthInTiles = (Uint32)convertStringToInt(widthTilesEditText.text, widthTilesEditText.letterCount);
+				tileMap.heightInTiles = (Uint32)convertStringToInt(heightTilesEditText.text, heightTilesEditText.letterCount);
+				
 				if (tileMapName && tileMap.tileSize != 0 &&
 				    tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
 				{
-				    deleteAllEditTexts();
-				    deleteAllTextFields();
+				    ui_delete(&tileMapNameText);
+				    ui_delete(&tileSizeText);
+				    ui_delete(&widthText);
+				    ui_delete(&pixelsText);
+				    ui_delete(&tilesText);
+				    ui_delete(&heightText);
+				    ui_delete(&pixelsText2);
+				    ui_delete(&tilesText2);
+				    
+				    ui_deleteGroup();
+				    
 				    buttonVisible = false;
 				    newTileMapButton.destroy();
 				    
@@ -618,10 +581,6 @@ int main(int argc, char* argv[])
 			    {
 				if (currentTool == FILL_TOOL)
 				{
-				    //TODO(denis): STILL BROKEN WHEN SELECTING
-				    // a new tile in the current tileset
-				    // the draw doesn't select the correct tile and
-				    // draws nothing
 				    if (selectionVisible &&
 					startSelectPos != Vector2{0,0})
 				    {
@@ -667,85 +626,74 @@ int main(int argc, char* argv[])
 			{
 			    char* theText = event.text.text;
 
-			    editTextAddLetter(theText[0], COLOUR_BLACK);
-
-			    int tileSize = convertStringToInt(tileSizeText->text, tileSizeText->letterCount);
+			    ui_processLetterTyped(theText[0]);
 			    
-			    if (tileSizeText->selected)
+			    int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
+			    
+			    if (tileSizeEditText.selected)
 			    {
-			        fillBWithAConverted(1.0F/(float)tileSize, widthTextPx, widthTextTiles);
-				fillBWithAConverted(1.0F/(float)tileSize, heightTextPx, heightTextTiles);
+			        fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
+				fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
 			    }
-			    else if (tileSizeText->text[0] != 0)
+			    else if (tileSizeEditText.text[0] != 0)
 			    {
-				if (widthTextTiles->text[0] != 0 ||
-				    widthTextPx->text[0] != 0)
+				if (widthTilesEditText.text[0] != 0 ||
+				    widthPxEditText.text[0] != 0)
 				{
-				    if (widthTextTiles->selected)
+				    if (widthTilesEditText.selected)
 				    {
-					fillBWithAConverted((float)tileSize, widthTextTiles, widthTextPx);
+					fillBWithAConverted((float)tileSize, &widthTilesEditText, &widthPxEditText);
 				    }
-				    else if (widthTextPx->selected)
+				    else if (widthPxEditText.selected)
 				    {
-				        fillBWithAConverted(1.0F/(float)tileSize, widthTextPx, widthTextTiles);
+				        fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
 				    }
 				}
-				if (heightTextTiles->text[0]!=0 ||
-				    heightTextPx->text[0] != 0)
+				if (heightTilesEditText.text[0]!=0 ||
+				    heightPxEditText.text[0] != 0)
 				{
-				    if (heightTextTiles->selected)
+				    if (heightTilesEditText.selected)
 				    {
-					fillBWithAConverted((float)tileSize, heightTextTiles, heightTextPx);
+					fillBWithAConverted((float)tileSize, &heightTilesEditText, &heightPxEditText);
 				    }
-				    else if (heightTextPx->selected)
+				    else if (heightPxEditText.selected)
 				    {
-					fillBWithAConverted(1.0F/(float)tileSize, heightTextPx, heightTextTiles);
+					fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
 				    }
 				}
 			    }
 			} break;
 
 			case SDL_KEYDOWN:
-			{			    
+			{
 			    if (event.key.keysym.sym == SDLK_BACKSPACE)
 			    {
-				EditText *text = getSelectedEditText();
-				editTextEraseLetter(text);
-				
-				if (text)
+				ui_eraseLetter();
+
+				int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
+
+				if (tileSize != 0)
 				{
-				    int tileSize = convertStringToInt(
-					tileSizeText->text, tileSizeText->letterCount);
-
-				    if (text->id == TILE_SIZE_TEXT)
+				    if (tileSizeEditText.selected)
 				    {
-					fillBWithAConverted(1.0F/(float)tileSize, widthTextPx, widthTextTiles);
-					fillBWithAConverted(1.0F/(float)tileSize, heightTextPx, heightTextTiles);
+					fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
+					fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
 				    }
-				    else
+				    else if (widthTilesEditText.selected)
 				    {
-					switch(text->id)
-					{
-					    case WIDTH_TEXT_PX:
-					    {
-						fillBWithAConverted(1.0F/(float)tileSize, text, widthTextTiles);
-					    } break;
-
-					    case WIDTH_TEXT_TILES:
-					    {
-						fillBWithAConverted((float)tileSize, text, widthTextPx);
-					    } break;
-
-					    case HEIGHT_TEXT_PX:
-					    {
-						fillBWithAConverted(1.0F/(float)tileSize, text, heightTextTiles);
-					    } break;
-
-					    case HEIGHT_TEXT_TILES:
-					    {
-						fillBWithAConverted((float)tileSize, text, heightTextPx);
-					    } break;
-					}
+					fillBWithAConverted((float)tileSize, &widthTilesEditText, &widthPxEditText);
+				    }
+				    else if (widthPxEditText.selected)
+				    {
+					fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
+				    }
+				    else if (heightTilesEditText.selected)
+				    {
+					fillBWithAConverted((float)tileSize, &heightTilesEditText, &heightPxEditText);
+				    }
+				    else if (heightPxEditText.selected)
+				    {
+					fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
 				    }
 				}
 			    }
@@ -756,15 +704,27 @@ int main(int argc, char* argv[])
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
 
+		ui_draw();
+		
 		if (buttonVisible)
 		{
-		    draw(renderer, &newTileMapButton);
+		    //TODO(denis): have groups that you can call draw on to
+		    //easily draw many things at once
+
+		    //NOTE(denis): drawing all textfields
+		    ui_draw(&tileMapNameText);
+		    ui_draw(&tileSizeText);
+		    ui_draw(&widthText);
+		    ui_draw(&pixelsText);
+		    ui_draw(&tilesText);
+		    ui_draw(&heightText);
+		    ui_draw(&pixelsText2);
+		    ui_draw(&tilesText2);
+
+		    ui_draw(&newTileMapButton);
 		}
 		
-		draw(renderer, &saveButton);
-
-		drawTextFields();
-		drawEditTexts();
+		ui_draw(&saveButton);
 
 		if (currentTileSet.background.image != NULL)
 		{
@@ -844,7 +804,7 @@ int main(int argc, char* argv[])
 		HeapFree(GetProcessHeap(), 0, tileMap.tiles);
 	}
 	
-	destroyUI();
+	ui_destroy();
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
     }

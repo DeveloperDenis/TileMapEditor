@@ -4,8 +4,10 @@
 #include "denis_math.h"
 #include "SDL_rect.h"
 
+struct SDL_Texture;
 
 //TODO(denis): probably a temporary header file that will be replaced
+
 struct Tile
 {
     SDL_Rect pos;
@@ -34,5 +36,13 @@ struct TileMap
 	return result;
     }
 };
+
+//TODO(denis): not sure where to put this
+struct TexturedRect
+{
+    SDL_Texture* image;
+    SDL_Rect pos;
+};
+
 
 #endif

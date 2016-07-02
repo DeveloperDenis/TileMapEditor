@@ -69,4 +69,17 @@ inline int absValue(int value)
     return value >= 0? value:-value;
 }
 
+//TODO(denis): there is a faster way I'm pretty sure
+inline int exponent(int base, int power)
+{
+    int result = 1;
+    
+    for (int i = 0; i < power; ++i)
+    {
+	result *= base;
+    }
+
+    return result;
+}
+
 #endif

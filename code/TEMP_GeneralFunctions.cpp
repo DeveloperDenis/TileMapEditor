@@ -1,26 +1,13 @@
 #include "SDL_rect.h"
 #include "denis_math.h"
 
-//TODO(denis): there is a faster way I'm pretty sure
-inline int exponent(int base, int power)
-{
-    int result = 1;
-    
-    for (int i = 0; i < power; ++i)
-    {
-	result *= base;
-    }
-
-    return result;
-}
-
-inline bool pointInRect(Vector2 point, SDL_Rect rect)
+static inline bool pointInRect(Vector2 point, SDL_Rect rect)
 {
     return point.x > rect.x && point.x < rect.x+rect.w &&
 	point.y > rect.y && point.y < rect.y+rect.h;
 }
 
-inline int convertStringToInt(char string[], int size)
+static inline int convertStringToInt(char string[], int size)
 {
     int result = 0;
 
@@ -30,5 +17,22 @@ inline int convertStringToInt(char string[], int size)
 	result += num;
     }
 
+    return result;
+}
+
+//NOTE(denis): assumes the char array is capped by 0
+static bool charInArray(char c, char array[])
+{
+    bool result = false;
+
+    if (array != NULL)
+    {
+	for (int i = 0; array[i] != 0 && !result; ++i)
+	{
+	    if (array[i] == c)
+		result = true;
+	}
+    }
+    
     return result;
 }
