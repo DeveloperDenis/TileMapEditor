@@ -1,32 +1,45 @@
 #include "file_saving_loading.h"
 #include "main.h"
+
+#define WINDOWS_API
+
+#if defined(C_STD_LIB)
 #include <stdio.h>
+#elif defined(WINDOWS_API)
+#include "windows.h"
+#endif
 
 //TODO(denis): eventually want to let the user choose where to save the file and the
 // name
 //TODO(denis): also want to be able to save in different formats
 void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 {
+    //TODO(denis): maybe make this bigger?
+    const int fileNameBufferSize = 256;
+    int charsToExtension = 0;
+
+    char fileName[fileNameBufferSize];
+    bool done = false;
+    for (int i = 0; i < fileNameBufferSize && !done; ++i)
+    {
+	if (tileMapName[i] == '\0')
+	{
+	    charsToExtension = i+1;
+	    done = true;
+	    fileName[i] = '.';
+	    fileName[i+1] = 'j';
+	    fileName[i+2] = 's';
+	    fileName[i+3] = '\0';
+	}
+	else
+	    fileName[i] = tileMapName[i];
+    }
+    
+#if defined(C_STD_LIB)
     FILE *outputFile = NULL;
 
     if (tileMapName)
     {
-	char fileName[128];
-	bool done = false;
-	for (int i = 0; i < 128 && !done; ++i)
-	{
-	    if (tileMapName[i] == '\0')
-	    {
-		done = true;
-		fileName[i] = '.';
-		fileName[i+1] = 'j';
-		fileName[i+2] = 's';
-		fileName[i+3] = '\0';
-	    }
-	    else
-		fileName[i] = tileMapName[i];
-	}
-	
         if (fopen_s(&outputFile, fileName, "w") == 0)
 	{
 	    fprintf(outputFile, "var %s = [", tileMapName);
@@ -70,4 +83,30 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 	    fclose(outputFile);
 	}
     }
+#elif defined(WINDOWS_API)
+
+    //TODO(denis): Windows wants you to use "Common Item Dialog" instead of this
+    
+    OPENFILENAME openFileName = {};
+    openFileName.lStructSize = sizeof(OPENFILENAME);
+//TODO(denis): if required can use SDL_GetWindowWMInfo()
+//openFileName.hwndOwner = ;
+    char *filter = "JavaScript File\0*.js\0Text File\0*.txt\0\0";
+    openFileName.lpstrFilter = filter;
+    openFileName.lpstrFile = fileName;
+    openFileName.nMaxFile = fileNameBufferSize;
+    //TODO(denis): dunno if I want this in the save function
+    //openFileName.lpstrFileTitle = ;
+    openFileName.Flags = OFN_OVERWRITEPROMPT;
+    openFileName.nFileExtension = (WORD)charsToExtension;
+    openFileName.lpstrDefExt = "js";
+    
+    BOOL result =  GetSaveFileName(&openFileName);
+
+    if (result != 0)
+    {
+	OutputDebugStringA("holy moly it works\n");
+    }
+    
+#endif
 }

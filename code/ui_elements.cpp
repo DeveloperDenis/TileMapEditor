@@ -211,7 +211,6 @@ void ui_delete(EditText *editText)
     }
 
     editText->letterCount = 0;
-    editText->text[0] = 0;
 }
 
 //TODO(denis): perhaps have multiple versions that do a different kind of
