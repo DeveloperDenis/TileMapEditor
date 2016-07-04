@@ -36,3 +36,24 @@ static bool charInArray(char c, char array[])
     
     return result;
 }
+
+static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
+					     int width, int height, Uint32 colour)
+{
+    TexturedRect result = {};
+
+    Uint32 rmask, gmask, bmask, amask;
+    amask = 0xFF000000;
+    bmask = 0x00FF0000;
+    gmask = 0x0000FF00;
+    rmask = 0x000000FF;
+    
+    SDL_Surface *rectangle = SDL_CreateRGBSurface(0, width, height, 32,
+						  rmask, gmask, bmask, amask);
+    SDL_FillRect(rectangle, NULL, colour);
+    result.image = SDL_CreateTextureFromSurface(renderer, rectangle);
+    SDL_GetClipRect(rectangle, &result.pos);
+    SDL_FreeSurface(rectangle);
+
+    return result;
+}

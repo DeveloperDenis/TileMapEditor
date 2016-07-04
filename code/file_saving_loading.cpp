@@ -1,13 +1,7 @@
 #include "file_saving_loading.h"
 #include "main.h"
-
-#define WINDOWS_API
-
-#if defined(C_STD_LIB)
-#include <stdio.h>
-#elif defined(WINDOWS_API)
+#include "stdio.h"
 #include "windows.h"
-#endif
 
 //TODO(denis): eventually want to let the user choose where to save the file and the
 // name
@@ -34,56 +28,6 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 	else
 	    fileName[i] = tileMapName[i];
     }
-    
-#if defined(C_STD_LIB)
-    FILE *outputFile = NULL;
-
-    if (tileMapName)
-    {
-        if (fopen_s(&outputFile, fileName, "w") == 0)
-	{
-	    fprintf(outputFile, "var %s = [", tileMapName);
-
-	    for (int i = 0; i < tileMap->heightInTiles; ++i)
-	    {
-		fprintf(outputFile, "[");
-		
-		for (int j = 0; j < tileMap->widthInTiles; ++j)
-		{
-		    Tile* tile = (tileMap->tiles + i*tileMap->widthInTiles + j);
-		    int tileValue;
-
-		    if (tile->sheetPos.w != 0 && tile->sheetPos.h != 0)
-		    {
-		    //TODO(denis): dunno if this expression is correct
-		    tileValue = tile->sheetPos.x / tileMap->tileSize +
-			tile->sheetPos.y/tileMap->tileSize*tileMap->widthInTiles;
-		    }
-		    else
-		    {
-			tileValue = -1;
-		    }
-		    
-		    fprintf(outputFile, "%d", tileValue);
-
-		    if (j < tileMap->widthInTiles-1)
-			fprintf(outputFile, ", ");
-		}
-
-		fprintf(outputFile, "]");
-
-		if (i < tileMap->heightInTiles-1)
-		    fprintf(outputFile, ",\n");
-		else
-		    fprintf(outputFile, "\n");
-	    }
-	    
-	    fprintf(outputFile, "];");
-	    
-	    fclose(outputFile);
-	}
-    }
-#elif defined(WINDOWS_API)
 
     //TODO(denis): Windows wants you to use "Common Item Dialog" instead of this
     
@@ -105,8 +49,55 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 
     if (result != 0)
     {
-	OutputDebugStringA("holy moly it works\n");
+	//TODO(denis): change the format of the save depending on what the file
+	// extension is
+	
+	FILE *outputFile = NULL;
+
+	if (tileMapName)
+	{
+	    if (fopen_s(&outputFile, fileName, "w") == 0)
+	    {
+		fprintf(outputFile, "var %s = [", tileMapName);
+
+		for (int i = 0; i < tileMap->heightInTiles; ++i)
+		{
+		    fprintf(outputFile, "[");
+		
+		    for (int j = 0; j < tileMap->widthInTiles; ++j)
+		    {
+			Tile* tile = (tileMap->tiles + i*tileMap->widthInTiles + j);
+			int tileValue;
+
+			if (tile->sheetPos.w != 0 && tile->sheetPos.h != 0)
+			{
+			    //TODO(denis): dunno if this expression is correct
+			    tileValue = tile->sheetPos.x / tileMap->tileSize +
+				tile->sheetPos.y/tileMap->tileSize*tileMap->widthInTiles;
+			}
+			else
+			{
+			    tileValue = -1;
+			}
+		    
+			fprintf(outputFile, "%d", tileValue);
+
+			if (j < tileMap->widthInTiles-1)
+			    fprintf(outputFile, ", ");
+		    }
+
+		    fprintf(outputFile, "]");
+
+		    if (i < tileMap->heightInTiles-1)
+			fprintf(outputFile, ",\n");
+		    else
+			fprintf(outputFile, "\n");
+		}
+	    
+		fprintf(outputFile, "];");
+	    
+		fclose(outputFile);
+	    }
+	}
     }
-    
-#endif
 }

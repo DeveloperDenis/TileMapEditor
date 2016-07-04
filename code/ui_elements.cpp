@@ -3,6 +3,8 @@
 #include "SDL_render.h"
 #include "TEMP_GeneralFunctions.cpp"
 
+#include "denis_adt.h"
+
 void Button::setPosition(Vector2 newPos)
 {
     this->background.pos.x = newPos.x;
@@ -42,11 +44,42 @@ static SDL_Renderer *_renderer;
 static TTF_Font *_font;
 static TextCursor _cursor;
 
-//TODO(denis): have this be a LinkedList or some type that can hold an arbitrary
-// number of group items
-// also, have another array/linked list that holds all the groups
-static EditText *_group[100];
-static int _groupCount;
+static LinkedList _groups;
+static int _currentID;
+
+static void ui_delete(LinkedList *ll)
+{
+    Node *current = ll->front;
+
+    while (current != NULL)
+    {
+	//TODO(denis): put this in a ui_delete(UIElement *) function?
+	switch(current->data.type)
+	{
+	    case UI_LINKEDLIST:
+		ui_delete(current->data.ll);
+		break;
+
+	    case UI_TEXTFIELD:
+		ui_delete(current->data.textField);
+		break;
+
+	    case UI_EDITTEXT:
+		ui_delete(current->data.editText);
+		break;
+
+	    case UI_BUTTON:
+		ui_delete(current->data.button);
+		break;
+	}
+
+	Node *next = current->next;
+	free(current);
+	current = next;
+    }
+
+    ll->front = 0;
+}
 
 static void resetCursorPosition(EditText *editText)
 {
@@ -55,6 +88,35 @@ static void resetCursorPosition(EditText *editText)
 
     if (_cursor.pos.x > editText->pos.x + editText->pos.w)
 	_cursor.pos.x -= editText->letters[editText->letterCount-1].pos.w;
+}
+
+//NOTE(denis): only one EditText can be selected per group
+static EditText* getSelectedEditText(int groupID)
+{
+    EditText *result = NULL;
+    Node *current = _groups.front;
+
+    while (current != NULL && current->data.ll->id != groupID)
+    {
+	current = current->next;
+    }
+
+    if (current != NULL)
+    {
+	current = current->data.ll->front;
+	while (current != NULL && !result)
+	{
+	    if (current->data.type == UI_EDITTEXT)
+	    {
+		EditText *editText = current->data.editText;
+		result = editText->selected ? editText : NULL;
+	    }
+
+	    current = current->next;
+	}
+    }
+
+    return result;
 }
 
 //NOTE(denis): assumes all letters are roughly the same width
@@ -82,15 +144,19 @@ bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize)
         _cursor.pos.h = 15;
         _cursor.flashRate = 300;
         _cursor.visible = true;
-	    
+
+	_currentID = 1;
+	
 	result = true;
     }
 
-    return result; 
+    return result;
 }
 
 void ui_destroy()
 {
+    ui_delete(&_groups);
+    
     TTF_CloseFont(_font);
     _font = NULL;
     
@@ -104,21 +170,34 @@ void ui_processMouseDown(Vector2 mousePos, Uint8 button)
 
 void ui_processMouseUp(Vector2 mousePos, Uint8 button)
 {
-    if (_groupCount > 0)
+    Node *currentRoot = _groups.front;
+    Node *currentGroup = NULL;
+    
+    while(currentRoot != 0)
     {
-	for (int i = 0; i < _groupCount; ++i)
+	currentGroup = currentRoot->data.ll->front;
+
+	while (currentGroup != 0)
 	{
 	    if (button == SDL_BUTTON_LEFT)
 	    {
-		_group[i]->selected = pointInRect(mousePos, _group[i]->pos);
-
-		if (_group[i]->selected)
+		if (currentGroup->data.type == UI_EDITTEXT)
 		{
-		    resetCursorPosition(_group[i]);
-		    _cursor.flashCounter = 0;
+		    EditText *data = currentGroup->data.editText;
+		    data->selected = pointInRect(mousePos, data->pos);
+
+		    if (data->selected)
+		    {
+			resetCursorPosition(data);
+			_cursor.flashCounter = 0;
+		    }
 		}
 	    }
+
+	    currentGroup = currentGroup->next;
 	}
+
+	currentRoot = currentRoot->next;
     }
 }
 
@@ -142,17 +221,12 @@ void ui_addLetterTo(EditText *editText, char c)
     }
 }
 
-//TODO(denis): take an id of the group to add a letter to
-// maybe have a way for mulitple groups to be called
-void ui_processLetterTyped(char c)
+void ui_processLetterTyped(char c, int groupID)
 {
-    for (int i = 0; i < _groupCount; ++i)
-    {
-	if (_group[i]->selected)
-	{
-	    ui_addLetterTo(_group[i], c);
-	}
-    }
+    EditText *editText = getSelectedEditText(groupID);
+
+    if (editText)
+	ui_addLetterTo(editText, c);
 }
 
 void ui_eraseLetter(EditText *editText)
@@ -166,34 +240,83 @@ void ui_eraseLetter(EditText *editText)
     }
 }
 
-void ui_eraseLetter()
+void ui_eraseLetter(int groupID)
 {
-    for (int i = 0; i < _groupCount; ++i)
-    {
-	if (_group[i]->selected)
-	{
-	    ui_eraseLetter(_group[i]);
-	}
-    }
+    EditText *editText = getSelectedEditText(groupID);
+    
+    if (editText)
+	ui_eraseLetter(editText);
 }
 
 //TODO(denis): have this take a UI element type and the group to add it to (by id or
 // something) or NULL for the group to add the element to a new group
 // and return the group id or whatever
-void ui_addToGroup(EditText *editText)
+int ui_addToGroup(EditText *editText)
 {
-    _group[_groupCount++] = editText;
+    return ui_addToGroup(editText, 0);
 }
 
-//TODO(denis): should take a group id
-void ui_deleteGroup()
+int ui_addToGroup(EditText *editText, int groupID)
 {
-    for (int i = 0; i < _groupCount; ++i)
+    int result = groupID;
+    
+    UIElement data = {};
+    data.type = UI_EDITTEXT;
+    data.editText = editText;
+
+    Node *current = _groups.front;
+    
+    while (current != NULL && current->data.type == UI_LINKEDLIST &&
+	   current->data.ll->id != groupID)
     {
-	ui_delete(_group[i]);
+	current = current->next;
+    }
+    
+    if (current != NULL)
+    {
+	adt_addTo(current->data.ll, data);
+    }
+    else
+    {
+	result = _currentID++;
+
+	UIElement newLL = {};
+	newLL.type = UI_LINKEDLIST;
+	newLL.ll = (LinkedList *)malloc(sizeof(LinkedList));
+        newLL.ll->front = NULL;
+	newLL.ll->id = result;
+	    
+	adt_addTo(&_groups, newLL);
+	adt_addTo(newLL.ll, data);
+    }
+    
+
+    return result;
+}
+
+//TODO(denis): also have a "clear group" function that doesn't delete the group?
+//TODO(denis): I don't think this deletes properly
+void ui_deleteGroup(int groupID)
+{
+    Node *current = _groups.front;
+    Node *prev = NULL;
+
+    while (current != NULL && current->data.ll->id != groupID)
+    {
+	prev = current;
+	current = current->next;
     }
 
-    _groupCount = 0;
+    if (current != NULL)
+    {
+	if (prev)
+	    prev->next = current->next;
+	else
+	    _groups = {};
+
+	ui_delete(current->data.ll);
+	free(current);
+    }
 }
 
 void ui_delete(TexturedRect *texturedRect)
@@ -211,6 +334,11 @@ void ui_delete(EditText *editText)
     }
 
     editText->letterCount = 0;
+}
+
+void ui_delete(Button *button)
+{
+    button->destroy();
 }
 
 //TODO(denis): perhaps have multiple versions that do a different kind of
@@ -248,6 +376,21 @@ EditText ui_createEditText(int x, int y, int width, int height,
     return result;
 }
 
+Button ui_createTextButton(char *text, SDL_Colour textColour,
+			   int width, int height, Uint32 backgroundColour)
+{
+    Button result = {};
+
+    result.text = text;
+    result.background = createFilledTexturedRect(_renderer, width, height, backgroundColour);
+
+    //TODO(denis): add options for left align, centre aligned, and right aligned text
+    result.foreground = ui_createTextField(text, result.background.pos.x,
+					result.background.pos.y, textColour);
+    
+    return result;
+}
+
 
 // NOTE(denis): all the drawing functions
 
@@ -255,16 +398,39 @@ void ui_draw()
 {
     bool editTextSelected = false;
     
-    for (int i = 0; i < _groupCount; ++i)
+    Node *currentRoot = _groups.front;
+    Node *currentGroup = NULL;
+    
+    while (currentRoot != 0)
     {
-	EditText *text = _group[i];
-        ui_draw(text);
-
-	if (text->selected)
+	currentGroup = currentRoot->data.ll->front;
+	while (currentGroup != NULL)
 	{
-	    resetCursorPosition(text);
-	    editTextSelected = true;
+	    switch (currentGroup->data.type)
+	    {
+		case UI_TEXTFIELD:
+		    ui_draw(currentGroup->data.textField);
+		    break;
+
+		case UI_EDITTEXT:
+		    if (currentGroup->data.editText->selected)
+		    {
+			editTextSelected = true;
+			resetCursorPosition(currentGroup->data.editText);
+		    }
+		    
+		    ui_draw(currentGroup->data.editText);
+		    break;
+
+		case UI_BUTTON:
+		    ui_draw(currentGroup->data.button);
+		    break;
+	    }
+	    
+	    currentGroup = currentGroup->next;
 	}
+
+	currentRoot = currentRoot->next;
     }
 
     if (editTextSelected)

@@ -117,43 +117,6 @@ static void reorientEditingArea(SDL_Window *window, TileMap *tileMap, int paddin
     }
 }
 
-static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
-					     int width, int height, Uint32 colour)
-{
-    TexturedRect result = {};
-
-    Uint32 rmask, gmask, bmask, amask;
-    amask = 0xFF000000;
-    bmask = 0x00FF0000;
-    gmask = 0x0000FF00;
-    rmask = 0x000000FF;
-    
-    SDL_Surface *rectangle = SDL_CreateRGBSurface(0, width, height, 32,
-						  rmask, gmask, bmask, amask);
-    SDL_FillRect(rectangle, NULL, colour);
-    result.image = SDL_CreateTextureFromSurface(renderer, rectangle);
-    SDL_GetClipRect(rectangle, &result.pos);
-    SDL_FreeSurface(rectangle);
-
-    return result;
-}
-
-static Button createNewTextButton(SDL_Renderer *renderer,
-				  char *text, SDL_Colour textColour,
-				  int width, int height, Uint32 backgroundColour)
-{
-    Button result = {};
-
-    result.text = text;
-    result.background = createFilledTexturedRect(renderer, width, height, backgroundColour);
-
-    //TODO(denis): add options for left align, centre aligned, and right aligned text
-    result.foreground = ui_createTextField(text, result.background.pos.x,
-					result.background.pos.y, textColour);
-    
-    return result;
-}
-
 static void fillBWithAConverted(float conversionFactor, EditText *A, EditText *B)
 {
     int numberA = convertStringToInt(A->text, A->letterCount);
@@ -242,38 +205,39 @@ int main(int argc, char* argv[])
 	    
 	    char numberChars[] =  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0};
 
+	    int editTextGroup = 0;
+	    
 	    EditText tileMapNameEditText =
 		ui_createEditText(250, 100, 200, 20, COLOUR_WHITE, 2);
-	    ui_addToGroup(&tileMapNameEditText);
+	    editTextGroup = ui_addToGroup(&tileMapNameEditText);
 	    
 	    EditText tileSizeEditText =
 		ui_createEditText(250, 150, 200, 20, COLOUR_WHITE, 2);
 	    tileSizeEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&tileSizeEditText);
+	    ui_addToGroup(&tileSizeEditText, editTextGroup);
 	    
 	    EditText widthPxEditText =
 		ui_createEditText(250, 200, 200, 20, COLOUR_WHITE,  2);
 	    widthPxEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&widthPxEditText);
+	    ui_addToGroup(&widthPxEditText, editTextGroup);
 	    
 	    EditText widthTilesEditText =
 		ui_createEditText(550, 200, 200, 20, COLOUR_WHITE, 2);
 	    widthTilesEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&widthTilesEditText);
+	    ui_addToGroup(&widthTilesEditText, editTextGroup);
 	    
 	    EditText heightPxEditText =
 		ui_createEditText(250, 250, 200, 20, COLOUR_WHITE, 2);
 	    heightPxEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&heightPxEditText);
+	    ui_addToGroup(&heightPxEditText, editTextGroup);
 	    
 	    EditText heightTilesEditText =
 		ui_createEditText(550, 250, 200, 20, COLOUR_WHITE, 2);
 	    heightTilesEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&heightTilesEditText);
+	    ui_addToGroup(&heightTilesEditText, editTextGroup);
 	    
-	    Button newTileMapButton =
-		createNewTextButton(renderer, "Create New Map", COLOUR_WHITE,
-				    200, 100, 0xFFFF0000);
+	    Button newTileMapButton = ui_createTextButton("Create New Map", COLOUR_WHITE,
+							  200, 100, 0xFFFF0000);
 	    newTileMapButton.setPosition({500, 500});
 	    bool buttonVisible = true;
 
@@ -482,7 +446,7 @@ int main(int argc, char* argv[])
 				    ui_delete(&pixelsText2);
 				    ui_delete(&tilesText2);
 				    
-				    ui_deleteGroup();
+				    ui_deleteGroup(editTextGroup);
 				    
 				    buttonVisible = false;
 				    newTileMapButton.destroy();
@@ -523,8 +487,8 @@ int main(int argc, char* argv[])
 					    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
 					selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
 
-					saveButton = createNewTextButton(renderer, "Save", COLOUR_WHITE,
-						    100, 50, 0xFF33AA88);
+					saveButton = ui_createTextButton("Save", COLOUR_WHITE,
+									 100, 50, 0xFF33AA88);
 				    }
 				}
 				else
@@ -549,9 +513,6 @@ int main(int argc, char* argv[])
 			    //NOTE(denis): hit the save button
 			    if (tileMap.tiles && saveButton.startedClick)
 			    {
-				OutputDebugStringA("you have saved the data\n");
-
-				//TODO(denis): actually save data
 				saveTileMapToFile(&tileMap, tileMapName);
 				
 				saveButton.startedClick = false;
@@ -626,7 +587,7 @@ int main(int argc, char* argv[])
 			{
 			    char* theText = event.text.text;
 
-			    ui_processLetterTyped(theText[0]);
+			    ui_processLetterTyped(theText[0], editTextGroup);
 			    
 			    int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
 			    
@@ -668,7 +629,7 @@ int main(int argc, char* argv[])
 			{
 			    if (event.key.keysym.sym == SDLK_BACKSPACE)
 			    {
-				ui_eraseLetter();
+				ui_eraseLetter(editTextGroup);
 
 				int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
 
