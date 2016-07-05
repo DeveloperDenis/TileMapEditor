@@ -11,10 +11,7 @@
  * slice up all the tiles in the loaded tileset and layout them out so they don't go
  * off screen
  *
- * add saving of tile maps to .js files
  * (support saving to different formats as well?)
- *
- * add saving to arbitrary folders
  *
  * loading a tilemap
  * (again in different formats)
@@ -37,29 +34,12 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 
-static bool buttonClicked(Button button, Vector2 mouse)
-{
-    return pointInRect(mouse, button.background.pos);
-}
-
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
 {
     Vector2 result = {};
 
     result = (pos - tileMap->offset)/tileMap->tileSize;
      
-    return result;
-}
-
-static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
-{
-    TexturedRect result = {};
-    
-    SDL_Surface *tempSurf = IMG_Load(fileName);
-    result.image = SDL_CreateTextureFromSurface(renderer, tempSurf);
-    SDL_GetClipRect(tempSurf, &result.pos);
-    SDL_FreeSurface(tempSurf);
-    
     return result;
 }
 
@@ -179,67 +159,76 @@ int main(int argc, char* argv[])
 	    TexturedRect selectionBox = {};
 	    TexturedRect selectedTile = {};
 
+	    int newTileMapGroup = 0;
+
 	    TexturedRect tileMapNameText =
 		ui_createTextField("Tile Map Name: ", 100, 100, COLOUR_WHITE);
+	    newTileMapGroup = ui_addToGroup(&tileMapNameText);
 
 	    TexturedRect tileSizeText =
 		ui_createTextField("Tile Size: ", 100, 150, COLOUR_WHITE);
-
+	    ui_addToGroup(&tileSizeText, newTileMapGroup);
+	    
 	    TexturedRect widthText =
 		ui_createTextField("Width: ", 100, 200, COLOUR_WHITE);
-
+	    ui_addToGroup(&widthText, newTileMapGroup);
+	    
 	    TexturedRect pixelsText =
 		ui_createTextField("pixels", 455, 200, COLOUR_WHITE);
-
+	    ui_addToGroup(&pixelsText, newTileMapGroup);
+	    
 	    TexturedRect tilesText =
 		ui_createTextField("tiles", 760, 200, COLOUR_WHITE);
-
+	    ui_addToGroup(&tilesText, newTileMapGroup);
+	    
 	    TexturedRect heightText =
 		ui_createTextField("Height: ", 100, 250, COLOUR_WHITE);
-
+	    ui_addToGroup(&heightText, newTileMapGroup);
+	    
 	    TexturedRect pixelsText2 =
 		ui_createTextField("pixels", 455, 250, COLOUR_WHITE);
-
+	    ui_addToGroup(&pixelsText2, newTileMapGroup);
+	    
 	    TexturedRect tilesText2 =
 		ui_createTextField("tiles", 760, 250, COLOUR_WHITE);
+	    ui_addToGroup(&tilesText2, newTileMapGroup);
 	    
 	    char numberChars[] =  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0};
-
-	    int editTextGroup = 0;
 	    
 	    EditText tileMapNameEditText =
 		ui_createEditText(250, 100, 200, 20, COLOUR_WHITE, 2);
-	    editTextGroup = ui_addToGroup(&tileMapNameEditText);
+	    newTileMapGroup = ui_addToGroup(&tileMapNameEditText);
 	    
 	    EditText tileSizeEditText =
 		ui_createEditText(250, 150, 200, 20, COLOUR_WHITE, 2);
 	    tileSizeEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&tileSizeEditText, editTextGroup);
+	    ui_addToGroup(&tileSizeEditText, newTileMapGroup);
 	    
 	    EditText widthPxEditText =
 		ui_createEditText(250, 200, 200, 20, COLOUR_WHITE,  2);
 	    widthPxEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&widthPxEditText, editTextGroup);
+	    ui_addToGroup(&widthPxEditText, newTileMapGroup);
 	    
 	    EditText widthTilesEditText =
 		ui_createEditText(550, 200, 200, 20, COLOUR_WHITE, 2);
 	    widthTilesEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&widthTilesEditText, editTextGroup);
+	    ui_addToGroup(&widthTilesEditText, newTileMapGroup);
 	    
 	    EditText heightPxEditText =
 		ui_createEditText(250, 250, 200, 20, COLOUR_WHITE, 2);
 	    heightPxEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&heightPxEditText, editTextGroup);
+	    ui_addToGroup(&heightPxEditText, newTileMapGroup);
 	    
 	    EditText heightTilesEditText =
 		ui_createEditText(550, 250, 200, 20, COLOUR_WHITE, 2);
 	    heightTilesEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&heightTilesEditText, editTextGroup);
+	    ui_addToGroup(&heightTilesEditText, newTileMapGroup);
 	    
-	    Button newTileMapButton = ui_createTextButton("Create New Map", COLOUR_WHITE,
-							  200, 100, 0xFFFF0000);
+	    Button newTileMapButton =
+		ui_createTextButton("Create New Map", COLOUR_WHITE,
+				    200, 100, 0xFFFF0000);
 	    newTileMapButton.setPosition({500, 500});
-	    bool buttonVisible = true;
+	    ui_addToGroup(&newTileMapButton, newTileMapGroup);
 
 	    
 	    Button saveButton = {};
@@ -248,12 +237,9 @@ int main(int argc, char* argv[])
 		   FILL_TOOL
 	    };
 	    Uint32 currentTool = FILL_TOOL;
-		
-	    Button paintToolIcon = {};
-	    paintToolIcon.background = loadImage(renderer, "paint-brush-icon-32.png");
-
-	    Button fillToolIcon = {};
-	    fillToolIcon.background = loadImage(renderer, "paint-can-icon-32.png");
+	    
+	    Button paintToolIcon = ui_createImageButton("paint-brush-icon-32.png");
+	    Button fillToolIcon = ui_createImageButton("paint-can-icon-32.png");
 		
 	    while (running)
 	    {
@@ -361,7 +347,6 @@ int main(int argc, char* argv[])
 					selectionBox.pos.y = tileMap.offset.y + tilePos.y*tileMap.tileSize;
 
 				    selectionBox.pos.h = tileMap.tileSize + absValue(tilePos.y - startedTilePos.y)*tileMap.tileSize;
-				    
 				}
 				else
 				{
@@ -377,10 +362,10 @@ int main(int argc, char* argv[])
 			    ui_processMouseDown(mouse, event.button.button);
 			    
 			    //TODO(denis): replace this with the ui call
-			    fillToolIcon.startedClick = buttonClicked(fillToolIcon, mouse);
-			    paintToolIcon.startedClick = buttonClicked(paintToolIcon, mouse);
-			    currentTileSet.startedClick = buttonClicked(currentTileSet, mouse);
-			    saveButton.startedClick = buttonClicked(saveButton, mouse);
+			    fillToolIcon.startedClick = pointInRect(mouse, fillToolIcon.background.pos);
+			    paintToolIcon.startedClick = pointInRect(mouse, paintToolIcon.background.pos);
+			    currentTileSet.startedClick = pointInRect(mouse, currentTileSet.background.pos);
+			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
@@ -426,7 +411,7 @@ int main(int argc, char* argv[])
 
 			    ui_processMouseUp(mouse, event.button.button);
 			    
-			    if (pointInRect(mouse, newTileMapButton.background.pos))
+			    if (ui_wasClicked(newTileMapButton, mouse))
 			    {
 				tileMapName = tileMapNameEditText.text;
 
@@ -436,20 +421,8 @@ int main(int argc, char* argv[])
 				
 				if (tileMapName && tileMap.tileSize != 0 &&
 				    tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
-				{
-				    ui_delete(&tileMapNameText);
-				    ui_delete(&tileSizeText);
-				    ui_delete(&widthText);
-				    ui_delete(&pixelsText);
-				    ui_delete(&tilesText);
-				    ui_delete(&heightText);
-				    ui_delete(&pixelsText2);
-				    ui_delete(&tilesText2);
-				    
-				    ui_deleteGroup(editTextGroup);
-				    
-				    buttonVisible = false;
-				    newTileMapButton.destroy();
+				{   
+				    ui_deleteGroup(newTileMapGroup);
 				    
 				    int memorySize = sizeof(Tile)*tileMap.widthInTiles*tileMap.heightInTiles;
 				    
@@ -497,8 +470,7 @@ int main(int argc, char* argv[])
 				}
 			    }
 
-			    if (tileMap.tiles && buttonClicked(currentTileSet, mouse) &&
-				currentTileSet.startedClick)
+			    if (tileMap.tiles && ui_wasClicked(currentTileSet, mouse))
 			    {
 				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.background.pos.x)/tileMap.tileSize * tileMap.tileSize;
 				selectedTile.pos.y = (selectionBox.pos.y - currentTileSet.background.pos.y)/tileMap.tileSize * tileMap.tileSize;
@@ -523,14 +495,12 @@ int main(int argc, char* argv[])
 			    {
 				//TODO(denis): implement a proper "radio button" type
 				// situation
-				if (buttonClicked(paintToolIcon, mouse) &&
-				    paintToolIcon.startedClick)
+				if (ui_wasClicked(paintToolIcon, mouse))
 				{
 				    currentTool = PAINT_TOOL;
 				    paintToolIcon.startedClick = false;
 				}
-				else if (buttonClicked(fillToolIcon, mouse) &&
-					 fillToolIcon.startedClick)
+				else if (ui_wasClicked(fillToolIcon, mouse))
 				{
 				    currentTool = FILL_TOOL;
 				    fillToolIcon.startedClick = false;
@@ -587,7 +557,7 @@ int main(int argc, char* argv[])
 			{
 			    char* theText = event.text.text;
 
-			    ui_processLetterTyped(theText[0], editTextGroup);
+			    ui_processLetterTyped(theText[0], newTileMapGroup);
 			    
 			    int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
 			    
@@ -629,7 +599,7 @@ int main(int argc, char* argv[])
 			{
 			    if (event.key.keysym.sym == SDLK_BACKSPACE)
 			    {
-				ui_eraseLetter(editTextGroup);
+				ui_eraseLetter(newTileMapGroup);
 
 				int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
 
@@ -666,24 +636,6 @@ int main(int argc, char* argv[])
 		SDL_RenderClear(renderer);
 
 		ui_draw();
-		
-		if (buttonVisible)
-		{
-		    //TODO(denis): have groups that you can call draw on to
-		    //easily draw many things at once
-
-		    //NOTE(denis): drawing all textfields
-		    ui_draw(&tileMapNameText);
-		    ui_draw(&tileSizeText);
-		    ui_draw(&widthText);
-		    ui_draw(&pixelsText);
-		    ui_draw(&tilesText);
-		    ui_draw(&heightText);
-		    ui_draw(&pixelsText2);
-		    ui_draw(&tilesText2);
-
-		    ui_draw(&newTileMapButton);
-		}
 		
 		ui_draw(&saveButton);
 

@@ -1,4 +1,5 @@
 #include "SDL_rect.h"
+#include "SDL_image.h"
 #include "denis_math.h"
 
 static inline bool pointInRect(Vector2 point, SDL_Rect rect)
@@ -55,5 +56,17 @@ static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
     SDL_GetClipRect(rectangle, &result.pos);
     SDL_FreeSurface(rectangle);
 
+    return result;
+}
+
+static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
+{
+    TexturedRect result = {};
+    
+    SDL_Surface *tempSurf = IMG_Load(fileName);
+    result.image = SDL_CreateTextureFromSurface(renderer, tempSurf);
+    SDL_GetClipRect(tempSurf, &result.pos);
+    SDL_FreeSurface(tempSurf);
+    
     return result;
 }

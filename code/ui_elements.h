@@ -69,6 +69,8 @@ void ui_destroy();
 void ui_processMouseDown(Vector2 mousePos, Uint8 button);
 void ui_processMouseUp(Vector2 mousePos, Uint8 button);
 
+bool ui_wasClicked(Button button, Vector2 mouse);
+
 void ui_addLetterTo(EditText *editText, char c);
 void ui_processLetterTyped(char c, int groupID);
 
@@ -82,6 +84,7 @@ EditText ui_createEditText(int x, int y, int width, int height,
 			   SDL_Color backgroundColour, int padding);
 Button ui_createTextButton(char *text, SDL_Color textColour, int width, int height,
 			   Uint32 backgroundColour);
+Button ui_createImageButton(char *imageFileName);
 
 //NOTE(denis): these functions return the id of the group the data was added to
 // for functions with two parameters the id may differ from the passed in ID if that
@@ -89,6 +92,10 @@ Button ui_createTextButton(char *text, SDL_Color textColour, int width, int heig
 //TODO(denis): maybe the id entered should be presevered even if it doesn't yet exist?
 int ui_addToGroup(EditText *editText);
 int ui_addToGroup(EditText *editText, int groupID);
+int ui_addToGroup(TexturedRect *textField);
+int ui_addToGroup(TexturedRect *textField, int groupID);
+int ui_addToGroup(Button *button);
+int ui_addToGroup(Button *button, int groupID);
 
 void ui_deleteGroup(int groupID);
 void ui_delete(TexturedRect *TexturedRect);

@@ -163,9 +163,36 @@ void ui_destroy()
     TTF_Quit();
 }
 
+bool ui_wasClicked(Button button, Vector2 mouse)
+{
+    return pointInRect(mouse, button.background.pos) && button.startedClick;
+}
+
 void ui_processMouseDown(Vector2 mousePos, Uint8 button)
 {
-    //TODO(denis): handle buttons in groups
+    Node *currentRoot = _groups.front;
+    Node *currentGroup = NULL;
+
+    while (currentRoot != NULL)
+    {
+	currentGroup = currentRoot->data.ll->front;
+
+	while (currentGroup != NULL)
+	{
+	    if (button == SDL_BUTTON_LEFT)
+	    {
+		if (currentGroup->data.type == UI_BUTTON)
+		{
+		    Button *data = currentGroup->data.button;
+		    data->startedClick = pointInRect(mousePos, data->background.pos);
+		}
+	    }
+	    
+	    currentGroup = currentGroup->next;
+	}
+
+	currentRoot = currentRoot->next;
+    }
 }
 
 void ui_processMouseUp(Vector2 mousePos, Uint8 button)
@@ -248,22 +275,10 @@ void ui_eraseLetter(int groupID)
 	ui_eraseLetter(editText);
 }
 
-//TODO(denis): have this take a UI element type and the group to add it to (by id or
-// something) or NULL for the group to add the element to a new group
-// and return the group id or whatever
-int ui_addToGroup(EditText *editText)
-{
-    return ui_addToGroup(editText, 0);
-}
-
-int ui_addToGroup(EditText *editText, int groupID)
+static int addToGroup(UIElement data, int groupID)
 {
     int result = groupID;
     
-    UIElement data = {};
-    data.type = UI_EDITTEXT;
-    data.editText = editText;
-
     Node *current = _groups.front;
     
     while (current != NULL && current->data.type == UI_LINKEDLIST &&
@@ -272,7 +287,7 @@ int ui_addToGroup(EditText *editText, int groupID)
 	current = current->next;
     }
     
-    if (current != NULL)
+    if (current != NULL && current->data.type == UI_LINKEDLIST)
     {
 	adt_addTo(current->data.ll, data);
     }
@@ -289,9 +304,56 @@ int ui_addToGroup(EditText *editText, int groupID)
 	adt_addTo(&_groups, newLL);
 	adt_addTo(newLL.ll, data);
     }
-    
 
     return result;
+}
+
+int ui_addToGroup(EditText *editText)
+{
+    return ui_addToGroup(editText, 0);
+}
+
+int ui_addToGroup(EditText *editText, int groupID)
+{
+    int result = groupID;
+    
+    UIElement data = {};
+    data.type = UI_EDITTEXT;
+    data.editText = editText;
+
+    result = addToGroup(data, groupID);    
+
+    return result;
+}
+
+int ui_addToGroup(TexturedRect *textField)
+{
+    return ui_addToGroup(textField, 0);
+}
+int ui_addToGroup(TexturedRect *textField, int groupID)
+{
+    int result = groupID;
+
+    UIElement data = {};
+    data.type = UI_TEXTFIELD;
+    data.textField = textField;
+
+    result = addToGroup(data, groupID);
+    
+    return result;
+}
+
+int ui_addToGroup(Button *button)
+{
+    return ui_addToGroup(button, 0);
+}
+int ui_addToGroup(Button *button, int groupID)
+{
+    UIElement data = {};
+    data.type = UI_BUTTON;
+    data.button = button;
+
+    return addToGroup(data, groupID);
 }
 
 //TODO(denis): also have a "clear group" function that doesn't delete the group?
@@ -387,6 +449,15 @@ Button ui_createTextButton(char *text, SDL_Colour textColour,
     //TODO(denis): add options for left align, centre aligned, and right aligned text
     result.foreground = ui_createTextField(text, result.background.pos.x,
 					result.background.pos.y, textColour);
+    
+    return result;
+}
+
+Button ui_createImageButton(char *imageFileName)
+{
+    Button result = {};
+    
+    result.background = loadImage(_renderer, imageFileName);
     
     return result;
 }
