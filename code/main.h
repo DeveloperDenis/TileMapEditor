@@ -44,5 +44,4 @@ struct TexturedRect
     SDL_Rect pos;
 };
 
-
 #endif

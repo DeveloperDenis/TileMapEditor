@@ -15,6 +15,8 @@
  *
  * loading a tilemap
  * (again in different formats)
+ *
+ * limit the FPS
  */
 
 #include <SDL.h>
@@ -33,6 +35,19 @@
 #define TITLE "Tile Map Editor"
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
+
+static SDL_Color hexColourToRGBA(Uint32 hex)
+{
+    SDL_Color result = {};
+
+    //NOTE(denis): hex colour format 0xAARRGGBB
+    result.r = (hex >> 16) & 0xFF;
+    result.g = (hex >> 8) & 0xFF;
+    result.b = hex & 0xFF;
+    result.a = hex >> 24;
+
+    return result;
+}
 
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
 {
@@ -62,8 +77,6 @@ static bool moveSelectionBox(TexturedRect *selectionBox, Vector2 mouse,
 	{
 	    Vector2 otherPos = {otherArea->pos.x, otherArea->pos.y};
 
-	    //TODO(denis): this seems dumb
-	    // get rid of / tileSize * tileSize
 	    Vector2 newPos = (mouse - otherPos)/tileSize * tileSize + otherPos;
 	    selectionBox->pos.x = newPos.x;
 	    selectionBox->pos.y = newPos.y;
@@ -75,13 +88,9 @@ static bool moveSelectionBox(TexturedRect *selectionBox, Vector2 mouse,
     return shouldBeDrawn;
 }
 
-static void reorientEditingArea(SDL_Window *window, TileMap *tileMap, int padding)
-{
-    int windowHeight = 0;
-    int windowWidth = 0;
-
-    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-
+static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tileMap, int padding,
+				int *menuX, int *menuY)
+{   
     int widthSpace = windowWidth - tileMap->tileSize*tileMap->widthInTiles;
     int heightSpace = windowHeight - tileMap->tileSize*tileMap->heightInTiles;
 
@@ -95,6 +104,10 @@ static void reorientEditingArea(SDL_Window *window, TileMap *tileMap, int paddin
         int offsetX = windowWidth/2 - tileMap->tileSize*tileMap->widthInTiles/2;
 	tileMap->offset = {offsetX, padding};
     }
+
+    //TODO(denis): hard-coding not good
+    *menuY = tileMap->offset.y - 50;
+    *menuX = tileMap->offset.x + 10;
 }
 
 static void fillBWithAConverted(float conversionFactor, EditText *A, EditText *B)
@@ -130,15 +143,18 @@ int main(int argc, char* argv[])
 					  SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
 					  WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
 
-    char *fontFileName = "LiberationMono-Regular.ttf";
-    int fontSize = 16;
+    char *defaultFontName= "LiberationMono-Regular.ttf";
+    int defaultFontSize = 16;
+
+    char *menuFontName = "LiberationMono-Regular.ttf";
+    int menuFontSize = 14;
     
     if (window)
     {
 	//TODO(denis): maybe add renderer flags?
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
 
-	if (renderer && ui_init(renderer, fontFileName, fontSize)
+	if (renderer && ui_init(renderer, defaultFontName, defaultFontSize)
 	    && IMG_Init(IMG_INIT_PNG) != 0)
 	{
 	    bool running = true;
@@ -161,6 +177,8 @@ int main(int argc, char* argv[])
 
 	    int newTileMapGroup = 0;
 
+	    Panel createTileMapPanel = {};
+	    
 	    TexturedRect tileMapNameText =
 		ui_createTextField("Tile Map Name: ", 100, 100, COLOUR_WHITE);
 	    newTileMapGroup = ui_addToGroup(&tileMapNameText);
@@ -230,6 +248,30 @@ int main(int argc, char* argv[])
 	    newTileMapButton.setPosition({500, 500});
 	    ui_addToGroup(&newTileMapButton, newTileMapGroup);
 
+	    ui_setFont(menuFontName, menuFontSize);
+
+	    //TODO(denis): update this as windows shrinks and grows
+	    int fileMenuWidth = WINDOW_WIDTH;
+	    int fileMenuHeight = 20;
+	    Uint32 fileMenuColour = 0xFFCCCCCC;
+	    char *items[] = {"File", "Create New Tile Map", "Save current tile map", "Exit"};
+	    //TODO(denis): center align text	     
+	    DropDownMenu fileMenu = ui_createDropDownMenu(items, 4, 225, fileMenuHeight, COLOUR_BLACK,
+							  fileMenuColour);
+	    
+	    TextBox item1 = {};
+	    TextBox item2 = {};
+	    TextBox item3 = {};
+
+	    TextBox *dropDown[] = {&item1, &item2, &item3};
+	    bool menuOpen = false;
+	    int menuX = 0;
+	    int menuY = 0;
+	    int selectedItem = 0;
+	    int menuLength = 3;
+	    int menuPause = 0;
+
+	    ui_setFont(defaultFontName, defaultFontSize);
 	    
 	    Button saveButton = {};
 	    
@@ -257,9 +299,16 @@ int main(int argc, char* argv[])
 			{
 			    if (event.window.event == SDL_WINDOWEVENT_RESIZED)
 			    {
+				int windowHeight = 0;
+				int windowWidth = 0;
+				SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+				fileMenuWidth = windowWidth;
+				
 				if (tileMap.tiles)
 				{
-				    reorientEditingArea(window, &tileMap, tileMapPadding);
+				    reorientEditingArea(windowWidth, windowHeight, &tileMap, tileMapPadding,
+							&menuX, &menuY);
 				    
 				    Tile *row = tileMap.tiles;
 				    for (int i = 0; i < tileMap.heightInTiles; ++i)
@@ -284,6 +333,15 @@ int main(int argc, char* argv[])
 			    // window but has moved off of it
 
 			    Vector2 mouse = {event.motion.x, event.motion.y};
+
+			    if (pointInRect(mouse, fileMenu.getRect()))
+			    {
+				SDL_Rect tempRect = fileMenu.getRect();
+				int selectedY = (mouse.y - tempRect.y)/fileMenu.items[0].pos.h;
+				fileMenu.highlightedItem = selectedY;
+			    }
+			    else
+				fileMenu.highlightedItem = -1;
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
@@ -366,8 +424,11 @@ int main(int argc, char* argv[])
 			    paintToolIcon.startedClick = pointInRect(mouse, paintToolIcon.background.pos);
 			    currentTileSet.startedClick = pointInRect(mouse, currentTileSet.background.pos);
 			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
+
+			    fileMenu.startedClick = pointInRect(mouse, fileMenu.getRect());
 			    
-			    if (currentTool == PAINT_TOOL && tileMap.tiles)
+			    if (menuPause > 15 &&
+				currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
 				if (event.button.button == SDL_BUTTON_LEFT)
 				{			    
@@ -431,7 +492,21 @@ int main(int argc, char* argv[])
 
 				    if (tileMap.tiles)
 				    {
-					reorientEditingArea(window, &tileMap, tileMapPadding);
+					int windowHeight = 0;
+					int windowWidth = 0;
+					SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+					
+					reorientEditingArea(windowWidth, windowHeight, &tileMap, tileMapPadding,
+							    &menuX, &menuY);
+
+					int textBoxWidth = tileMap.widthInTiles*tileMap.tileSize - 20;
+					item1 = ui_createTextBox("first tile map", textBoxWidth, 35, COLOUR_BLACK,
+								 0xFFFFFFFF);
+					item2 = ui_createTextBox("second tile map", textBoxWidth, 35, COLOUR_BLACK,
+								 0xFFFFFFFF);
+					item3 = ui_createTextBox("third tile map", textBoxWidth, 35, COLOUR_BLACK,
+								 0xFFFFFFFF);
+					item1.setPosition({menuX, menuY});
 					
 					Tile *row = tileMap.tiles;
 					for (int i = 0; i < tileMap.heightInTiles; ++i)
@@ -470,6 +545,49 @@ int main(int argc, char* argv[])
 				}
 			    }
 
+			    //NOTE(denis): top file menu
+			    if (fileMenu.isOpen && fileMenu.startedClick &&
+				pointInRect(mouse, fileMenu.getRect()))
+			    {
+				SDL_Rect tempRect = fileMenu.getRect();
+				int selectedY = (mouse.y - tempRect.y)/fileMenu.items[0].pos.h;
+				if (selectedY == 0)
+				{
+				    fileMenu.isOpen = false;
+				    fileMenu.startedClick = false;
+				}
+			    }
+			    else if (!fileMenu.isOpen && fileMenu.startedClick &&
+				     pointInRect(mouse, fileMenu.getRect()))
+			    {
+				fileMenu.isOpen = true;
+			    }
+			    else if (fileMenu.isOpen)
+			    {
+				fileMenu.isOpen = false;
+			    }
+			    
+			    //TODO(denis): temporary drop down menu test
+			    if (!menuOpen && tileMap.tiles && 
+				pointInRect(mouse, dropDown[selectedItem]->pos))
+			    {
+				menuOpen = true;
+			    }
+			    else if (menuOpen)
+			    {
+				menuOpen = false;
+				//TODO(denis): there are still bugs related to this
+				menuPause = 0;
+
+				for (int i = 0; i < menuLength; ++i)
+				{
+				    if (pointInRect(mouse, dropDown[i]->pos))
+				    {
+					selectedItem = i;
+				    }
+				}
+			    }
+			    
 			    if (tileMap.tiles && ui_wasClicked(currentTileSet, mouse))
 			    {
 				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.background.pos.x)/tileMap.tileSize * tileMap.tileSize;
@@ -508,7 +626,7 @@ int main(int argc, char* argv[])
 			    }
 
 			    //NOTE(denis): tool behaviour
-			    if (tileMap.tiles)
+			    if (tileMap.tiles && menuPause > 15)
 			    {
 				if (currentTool == FILL_TOOL)
 				{
@@ -635,10 +753,17 @@ int main(int argc, char* argv[])
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
 
+		SDL_Color colour = hexColourToRGBA(fileMenuColour);
+		SDL_SetRenderDrawColor(renderer, colour.r, colour.g, colour.b, colour.a);
+		SDL_Rect rect = {0, 0, fileMenuWidth, fileMenuHeight};
+		SDL_RenderFillRect(renderer, &rect);
+		
 		ui_draw();
 		
 		ui_draw(&saveButton);
 
+		ui_draw(&fileMenu);
+		
 		if (currentTileSet.background.image != NULL)
 		{
 		    int tileMapBottom = tileMap.offset.y + tileMap.heightInTiles*tileMap.tileSize;
@@ -681,7 +806,7 @@ int main(int argc, char* argv[])
 		}
 		
 		if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
-		{
+		{   
 		    TexturedRect defaultTile = createFilledTexturedRect(renderer, tileMap.tileSize, tileMap.tileSize, 0xFFAAAA00);
 		    Tile *row = tileMap.tiles;
 		    for (int i = 0; i < tileMap.heightInTiles; ++i)
@@ -706,6 +831,33 @@ int main(int argc, char* argv[])
 		    
 		    if (selectionVisible)
 			SDL_RenderCopy(renderer, selectionBox.image, NULL, &selectionBox.pos);
+
+		    //TODO(denis): testing drop down menu
+		    ++menuPause;
+		    if (menuOpen)
+		    {
+			dropDown[selectedItem]->setPosition({menuX, menuY});
+		    
+			int menuPos = 1;
+			ui_draw(dropDown[selectedItem]);
+		    
+			for (int i = 0; i < menuLength; ++i)
+			{
+			    if (i != selectedItem)
+			    {
+				int x = dropDown[selectedItem]->pos.x;
+				int y = dropDown[selectedItem]->pos.y + dropDown[selectedItem]->pos.h*menuPos;
+				dropDown[i]->setPosition({x, y});
+				ui_draw(dropDown[i]);
+				++menuPos;
+			    }
+			}
+		    }
+		    else
+		    {
+			dropDown[selectedItem]->setPosition({menuX, menuY});
+			ui_draw(dropDown[selectedItem]);
+		    }
 		}
 		
 		SDL_RenderPresent(renderer);

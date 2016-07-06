@@ -21,7 +21,7 @@ static inline int convertStringToInt(char string[], int size)
     return result;
 }
 
-//NOTE(denis): assumes the char array is capped by 0
+//NOTE(denis): assumes the char array is a valid string
 static bool charInArray(char c, char array[])
 {
     bool result = false;
@@ -34,6 +34,26 @@ static bool charInArray(char c, char array[])
 		result = true;
 	}
     }
+    
+    return result;
+}
+
+//NOTE(denis): only works for valid strings
+static bool stringsEqual(char *A, char *B)
+{
+    bool result = true;
+
+    int charIndex = 0;
+    while (A[charIndex] != 0 && B[charIndex] != 0 && result)
+    {
+	if (A[charIndex] != B[charIndex])
+	    result = false;
+	
+	++charIndex;
+    }
+
+    if (A[charIndex] != B[charIndex])
+	result = false;
     
     return result;
 }

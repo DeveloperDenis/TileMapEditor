@@ -29,6 +29,32 @@ void Button::destroy()
     this->foreground = {};
 }
 
+void TextBox::setPosition(Vector2 newPos)
+{
+    this->pos.x = newPos.x;
+    this->pos.y = newPos.y;
+
+    //TODO(denis): doesn't take into account any text padding
+    this->text.pos.x = newPos.x;
+    this->text.pos.y = newPos.y;
+}
+
+SDL_Rect DropDownMenu::getRect()
+{
+    SDL_Rect result = {};
+    result.x = this->items[0].pos.x;
+    result.y = this->items[0].pos.y;
+    result.w = this->items[0].pos.w;
+    result.h = this->items[0].pos.h;
+    
+    if (this->isOpen)
+    {
+	result.h *= this->itemCount;
+    }
+    
+    return result;
+}
+
 #include "SDL_ttf.h"
 /* TODO(denis):
  *   to dos:
@@ -40,8 +66,14 @@ void Button::destroy()
  *      of how many calls since they were used?)
  */
 
+#define MAX_FONT_NUM 15
+
 static SDL_Renderer *_renderer;
-static TTF_Font *_font;
+
+static TTF_Font *_fonts[MAX_FONT_NUM];
+static int _fontsLength;
+static int _selectedFont;
+
 static TextCursor _cursor;
 
 static LinkedList _groups;
@@ -70,6 +102,10 @@ static void ui_delete(LinkedList *ll)
 
 	    case UI_BUTTON:
 		ui_delete(current->data.button);
+		break;
+
+	    case UI_TEXTBOX:
+		ui_delete(current->data.textBox);
 		break;
 	}
 
@@ -136,8 +172,8 @@ bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize)
     bool result = false;
 
     if (TTF_Init() == 0 &&
-	(_font = TTF_OpenFont(fontName, fontSize)))
-    {
+	(_fonts[_fontsLength++] = TTF_OpenFont(fontName, fontSize)))
+    {	
         _renderer = renderer;
 	    
         _cursor.pos.w = 5;
@@ -156,11 +192,45 @@ bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize)
 void ui_destroy()
 {
     ui_delete(&_groups);
-    
-    TTF_CloseFont(_font);
-    _font = NULL;
+
+    for (int i = 0; i < _fontsLength; ++i)
+    {
+	TTF_CloseFont(_fonts[i]);
+    }
+    _fontsLength = 0;
     
     TTF_Quit();
+}
+
+bool ui_setFont(char *fontName, int fontSize)
+{
+    bool result = false;
+    
+    for (int i = 0; i < _fontsLength; ++i)
+    {
+	char *currFontName = TTF_FontFaceFamilyName(_fonts[i]);
+	int currFontSize = TTF_FontHeight(_fonts[i]);
+
+	if (currFontSize == fontSize &&
+	    stringsEqual(fontName, currFontName))
+	{
+	    _selectedFont = i;
+	    result = true;
+	}
+    }
+
+    if (!result)
+    {
+	_fonts[_fontsLength] = TTF_OpenFont(fontName, fontSize);
+	if (_fonts[_fontsLength] != NULL)
+	{
+	    result = true;
+	    _selectedFont = _fontsLength;
+	    ++_fontsLength;
+	}
+    }
+
+    return result;
 }
 
 bool ui_wasClicked(Button button, Vector2 mouse)
@@ -315,15 +385,11 @@ int ui_addToGroup(EditText *editText)
 
 int ui_addToGroup(EditText *editText, int groupID)
 {
-    int result = groupID;
-    
     UIElement data = {};
     data.type = UI_EDITTEXT;
     data.editText = editText;
 
-    result = addToGroup(data, groupID);    
-
-    return result;
+    return addToGroup(data, groupID);    
 }
 
 int ui_addToGroup(TexturedRect *textField)
@@ -332,15 +398,11 @@ int ui_addToGroup(TexturedRect *textField)
 }
 int ui_addToGroup(TexturedRect *textField, int groupID)
 {
-    int result = groupID;
-
     UIElement data = {};
     data.type = UI_TEXTFIELD;
     data.textField = textField;
 
-    result = addToGroup(data, groupID);
-    
-    return result;
+    return addToGroup(data, groupID);
 }
 
 int ui_addToGroup(Button *button)
@@ -352,6 +414,19 @@ int ui_addToGroup(Button *button, int groupID)
     UIElement data = {};
     data.type = UI_BUTTON;
     data.button = button;
+
+    return addToGroup(data, groupID);
+}
+
+int ui_addToGroup(TextBox *textBox)
+{
+    return ui_addToGroup(textBox, 0);
+}
+int ui_addToGroup(TextBox *textBox, int groupID)
+{
+    UIElement data = {};
+    data.type = UI_TEXTBOX;
+    data.textBox = textBox;
 
     return addToGroup(data, groupID);
 }
@@ -403,6 +478,16 @@ void ui_delete(Button *button)
     button->destroy();
 }
 
+void ui_delete(TextBox *textBox)
+{
+    SDL_DestroyTexture(textBox->background);
+    ui_delete(&textBox->text);
+
+    textBox->background = 0;
+    textBox->text = {};
+    textBox->pos = {};
+}
+
 //TODO(denis): perhaps have multiple versions that do a different kind of
 // TTF_RenderText, like Shaded and Solid
 //TODO(denis): exchange everything to 0xAABBGGRR ? dunno
@@ -412,7 +497,7 @@ TexturedRect ui_createTextField(char *text, int x, int y, SDL_Color colour)
 {
     TexturedRect result = {};
     
-    SDL_Surface* tempSurf = TTF_RenderText_Blended(_font, text, colour);
+    SDL_Surface* tempSurf = TTF_RenderText_Blended(_fonts[_selectedFont], text, colour);
 
     SDL_GetClipRect(tempSurf, &result.pos);
     result.pos.x = x;
@@ -421,6 +506,25 @@ TexturedRect ui_createTextField(char *text, int x, int y, SDL_Color colour)
     result.image = SDL_CreateTextureFromSurface(_renderer, tempSurf);
     SDL_FreeSurface(tempSurf);
 
+    return result;
+}
+
+//TODO(denis): really don't like this mismatch of SDL_Color and Uint32
+TextBox ui_createTextBox(char *text, int minWidth, int minHeight,
+			 SDL_Color textColour, Uint32 backgroundColour)
+{
+    TextBox result = {};
+
+    result.text = ui_createTextField(text, 0, 0, textColour);
+
+    int backgroundWidth = minWidth > result.text.pos.w ? minWidth : result.text.pos.w;
+    int backgroundHeight = minHeight > result.text.pos.h ? minHeight : result.text.pos.h;
+    TexturedRect temp =
+	createFilledTexturedRect(_renderer, backgroundWidth,
+				 backgroundHeight, backgroundColour);
+    result.background = temp.image;
+    result.pos = temp.pos;
+    
     return result;
 }
 
@@ -462,6 +566,30 @@ Button ui_createImageButton(char *imageFileName)
     return result;
 }
 
+//TODO(denis): define some function/macro or something to simplify this colour nonsense
+DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
+				   int itemWidth, int itemHeight,
+				   SDL_Color textColour, Uint32 backgroundColour)
+{
+    DropDownMenu result = {};
+    //TODO(denis): don't hardcode selection colour
+    Uint32 selectionColour = 0xFF555555;
+    result.highlightedItem = -1;
+    result.selectionBox = createFilledTexturedRect(_renderer, itemWidth, itemHeight,
+						   selectionColour).image;
+    
+    //TODO(denis): since result.items is only length 10 this could cause issues
+    result.itemCount = itemNum;
+    
+    for (int i = 0; i < result.itemCount; ++i)
+    {
+	result.items[i] = ui_createTextBox(items[i], itemWidth, itemHeight,
+					   textColour, backgroundColour);
+	result.unselectedTexture = result.items[i].background;
+    }
+
+    return result;
+}
 
 // NOTE(denis): all the drawing functions
 
@@ -493,8 +621,16 @@ void ui_draw()
 		    ui_draw(currentGroup->data.editText);
 		    break;
 
+		case UI_TEXTBOX:
+		    ui_draw(currentGroup->data.textBox);
+		    break;
+		    
 		case UI_BUTTON:
 		    ui_draw(currentGroup->data.button);
+		    break;
+
+		case UI_DROPDOWNMENU:
+		    ui_draw(currentGroup->data.dropDownMenu);
 		    break;
 	    }
 	    
@@ -551,6 +687,62 @@ void ui_draw(EditText *editText)
 	{
 	    SDL_RenderCopy(_renderer, editText->letters[i].image,
 			   NULL, &editText->letters[i].pos);
+	}
+    }
+}
+
+void ui_draw(TextBox *textBox)
+{
+    if (textBox)
+    {
+	if (textBox->background)
+	    SDL_RenderCopy(_renderer, textBox->background, NULL, &textBox->pos);
+	
+	if (textBox->text.image)
+	    SDL_RenderCopy(_renderer, textBox->text.image, NULL, &textBox->text.pos);
+    }
+}
+
+void ui_draw(DropDownMenu *dropDownMenu)
+{
+    if (dropDownMenu->itemCount > 0)
+    {
+	int x = dropDownMenu->items[0].pos.x;
+	int y = dropDownMenu->items[0].pos.y;
+	int itemHeight = dropDownMenu->items[0].pos.h;
+
+	if (dropDownMenu->isOpen)
+	{
+	    dropDownMenu->items[0].background = dropDownMenu->selectionBox;
+	    
+	    for (int i = 0; i < dropDownMenu->itemCount; ++i)
+	    {
+		if (dropDownMenu->items[i].background != NULL)
+		{
+		    if (i == dropDownMenu->highlightedItem && i!=0)
+		    {
+			dropDownMenu->items[i].background = dropDownMenu->selectionBox;
+		    }
+		    else if (i != 0)
+			dropDownMenu->items[i].background = dropDownMenu->unselectedTexture;
+		    
+		    dropDownMenu->items[i].setPosition({x, y + i*itemHeight});
+		    
+		    ui_draw(&dropDownMenu->items[i]);
+		}
+	    }
+	}
+	else
+	{
+	    if (dropDownMenu->highlightedItem == 0)
+	    {
+		dropDownMenu->items[0].background = dropDownMenu->selectionBox;
+	    }
+	    else
+	    {
+		dropDownMenu->items[0].background = dropDownMenu->unselectedTexture;
+	    }
+	    ui_draw(&dropDownMenu->items[0]);
 	}
     }
 }
