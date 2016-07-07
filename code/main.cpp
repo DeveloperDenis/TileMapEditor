@@ -36,19 +36,6 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 
-static SDL_Color hexColourToRGBA(Uint32 hex)
-{
-    SDL_Color result = {};
-
-    //NOTE(denis): hex colour format 0xAARRGGBB
-    result.r = (hex >> 16) & 0xFF;
-    result.g = (hex >> 8) & 0xFF;
-    result.b = hex & 0xFF;
-    result.a = hex >> 24;
-
-    return result;
-}
-
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
 {
     Vector2 result = {};
@@ -177,8 +164,6 @@ int main(int argc, char* argv[])
 
 	    int newTileMapGroup = 0;
 
-	    Panel createTileMapPanel = {};
-	    
 	    TexturedRect tileMapNameText =
 		ui_createTextField("Tile Map Name: ", 100, 100, COLOUR_WHITE);
 	    newTileMapGroup = ui_addToGroup(&tileMapNameText);
@@ -250,14 +235,15 @@ int main(int argc, char* argv[])
 
 	    ui_setFont(menuFontName, menuFontSize);
 
-	    //TODO(denis): update this as windows shrinks and grows
-	    int fileMenuWidth = WINDOW_WIDTH;
-	    int fileMenuHeight = 20;
-	    Uint32 fileMenuColour = 0xFFCCCCCC;
-	    char *items[] = {"File", "Create New Tile Map", "Save current tile map", "Exit"};
-	    //TODO(denis): center align text	     
-	    DropDownMenu fileMenu = ui_createDropDownMenu(items, 4, 225, fileMenuHeight, COLOUR_BLACK,
-							  fileMenuColour);
+	    MenuBar topMenuBar = ui_createMenuBar(0, 0, WINDOW_WIDTH, 20,
+						  0xFFCCCCCC, 0xFF000000);
+	    
+	    char *items[] = {"File", "Open Tile Map...", "Save Tile Map...", "Exit"};	     
+	    topMenuBar.addMenu(items, 4, 225);
+	    items[0] = "Tile Maps";
+	    items[1] = "Create New";
+	    items[2] = "NOT FINAL";
+	    topMenuBar.addMenu(items, 3, 225);
 	    
 	    TextBox item1 = {};
 	    TextBox item2 = {};
@@ -303,7 +289,8 @@ int main(int argc, char* argv[])
 				int windowWidth = 0;
 				SDL_GetWindowSize(window, &windowWidth, &windowHeight);
 
-				fileMenuWidth = windowWidth;
+			        topMenuBar.botRight.x =
+				    topMenuBar.topLeft.x + windowWidth;
 				
 				if (tileMap.tiles)
 				{
@@ -334,14 +321,8 @@ int main(int argc, char* argv[])
 
 			    Vector2 mouse = {event.motion.x, event.motion.y};
 
-			    if (pointInRect(mouse, fileMenu.getRect()))
-			    {
-				SDL_Rect tempRect = fileMenu.getRect();
-				int selectedY = (mouse.y - tempRect.y)/fileMenu.items[0].pos.h;
-				fileMenu.highlightedItem = selectedY;
-			    }
-			    else
-				fileMenu.highlightedItem = -1;
+			    topMenuBar.onMouseMove(mouse);
+
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
@@ -425,7 +406,7 @@ int main(int argc, char* argv[])
 			    currentTileSet.startedClick = pointInRect(mouse, currentTileSet.background.pos);
 			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
 
-			    fileMenu.startedClick = pointInRect(mouse, fileMenu.getRect());
+			    topMenuBar.onMouseDown(mouse, event.button.button);
 			    
 			    if (menuPause > 15 &&
 				currentTool == PAINT_TOOL && tileMap.tiles)
@@ -471,6 +452,8 @@ int main(int argc, char* argv[])
 			    Vector2 mouse = {event.button.x, event.button.y};
 
 			    ui_processMouseUp(mouse, event.button.button);
+			    
+			    topMenuBar.onMouseUp(mouse, event.button.button);
 			    
 			    if (ui_wasClicked(newTileMapButton, mouse))
 			    {
@@ -543,28 +526,6 @@ int main(int argc, char* argv[])
 				{
 				    OutputDebugStringA("you gotta fill it all out!\n");
 				}
-			    }
-
-			    //NOTE(denis): top file menu
-			    if (fileMenu.isOpen && fileMenu.startedClick &&
-				pointInRect(mouse, fileMenu.getRect()))
-			    {
-				SDL_Rect tempRect = fileMenu.getRect();
-				int selectedY = (mouse.y - tempRect.y)/fileMenu.items[0].pos.h;
-				if (selectedY == 0)
-				{
-				    fileMenu.isOpen = false;
-				    fileMenu.startedClick = false;
-				}
-			    }
-			    else if (!fileMenu.isOpen && fileMenu.startedClick &&
-				     pointInRect(mouse, fileMenu.getRect()))
-			    {
-				fileMenu.isOpen = true;
-			    }
-			    else if (fileMenu.isOpen)
-			    {
-				fileMenu.isOpen = false;
 			    }
 			    
 			    //TODO(denis): temporary drop down menu test
@@ -752,18 +713,12 @@ int main(int argc, char* argv[])
 
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
-
-		SDL_Color colour = hexColourToRGBA(fileMenuColour);
-		SDL_SetRenderDrawColor(renderer, colour.r, colour.g, colour.b, colour.a);
-		SDL_Rect rect = {0, 0, fileMenuWidth, fileMenuHeight};
-		SDL_RenderFillRect(renderer, &rect);
 		
 		ui_draw();
-		
+
+		ui_draw(&topMenuBar);
 		ui_draw(&saveButton);
 
-		ui_draw(&fileMenu);
-		
 		if (currentTileSet.background.image != NULL)
 		{
 		    int tileMapBottom = tileMap.offset.y + tileMap.heightInTiles*tileMap.tileSize;

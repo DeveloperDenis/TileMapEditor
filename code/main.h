@@ -1,6 +1,7 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#include "denis_meta.h"
 #include "denis_math.h"
 #include "SDL_rect.h"
 

@@ -68,6 +68,25 @@ struct DropDownMenu
     SDL_Rect getRect();
 };
 
+struct MenuBar
+{
+    DropDownMenu menus[6];
+    int menuCount;
+
+    Vector2 topLeft;
+    Vector2 botRight;
+
+    //TODO(denis): should this be a Texture or just a colour?
+    Uint32 colour;
+    Uint32 textColour;
+
+    void addMenu(char *items[], int numItems, int menuWidth);
+
+    void onMouseMove(Vector2 mousePos);
+    void onMouseDown(Vector2 mousePos, Uint8 button);
+    void onMouseUp(Vector2 mousePos, Uint8 button);
+};
+
 enum
 {
     UI_LINKEDLIST = 1,
@@ -90,12 +109,6 @@ struct UIElement
 	Button *button;
 	DropDownMenu *dropDownMenu;
     };
-};
-
-struct Panel
-{
-    LinkedList elements;
-    bool visible;
 };
 
 bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize);
@@ -130,6 +143,8 @@ Button ui_createImageButton(char *imageFileName);
 DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
 				   int itemWidth, int itemHeight,
 				   SDL_Color textColour, Uint32 backgroundColour);
+MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 colour,
+			 Uint32 textColour);
 
 //NOTE(denis): these functions return the id of the group the data was added to
 // for functions with two parameters the id may differ from the passed in ID if that
@@ -158,6 +173,7 @@ void ui_draw(TexturedRect *texturedRect);
 void ui_draw(EditText *editText);
 void ui_draw(TextBox *textBox);
 void ui_draw(DropDownMenu *dropDownMenu);
+void ui_draw(MenuBar *menuBar);
 
 const SDL_Color COLOUR_WHITE = {255,255,255,255};
 const SDL_Color COLOUR_BLACK = {0,0,0,255};

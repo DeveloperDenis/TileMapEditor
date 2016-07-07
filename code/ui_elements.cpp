@@ -55,12 +55,82 @@ SDL_Rect DropDownMenu::getRect()
     return result;
 }
 
+void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
+{
+    int height = this->botRight.y - this->topLeft.y;
+    SDL_Color textColour = hexColourToRGBA(this->textColour);
+    
+    this->menus[this->menuCount] = ui_createDropDownMenu(items, numItems, menuWidth,
+							 height, textColour,
+							 this->colour);
+    int x = this->topLeft.x;
+    if (this->menuCount > 0)
+	x += this->menuCount*this->menus[this->menuCount-1].items[0].pos.w;
+    
+    this->menus[this->menuCount].items[0].setPosition({x, 0});
+    
+    ++this->menuCount;
+}
+
+void MenuBar::onMouseMove(Vector2 mousePos)
+{
+    for (int i = 0; i < this->menuCount; ++i)
+    {
+	if (pointInRect(mousePos, this->menus[i].getRect()))
+	{
+	    SDL_Rect tempRect = this->menus[i].getRect();
+	    int selectedY = (mousePos.y - tempRect.y)/this->menus[i].items[0].pos.h;
+	    this->menus[i].highlightedItem = selectedY;
+	}
+	else
+	    this->menus[i].highlightedItem = -1;
+    }
+}
+
+void MenuBar::onMouseDown(Vector2 mousePos, Uint8 button)
+{
+    for (int i = 0; i < this->menuCount; ++i)
+    {
+	if (button == SDL_BUTTON_LEFT)
+	    this->menus[i].startedClick =
+		pointInRect(mousePos, this->menus[i].getRect());
+    }
+}
+
+void MenuBar::onMouseUp(Vector2 mousePos, Uint8 button)
+{
+    for (int i = 0; i < this->menuCount; ++i)
+    {
+	if (button == SDL_BUTTON_LEFT)
+	{
+	    bool menuClicked = pointInRect(mousePos, this->menus[i].getRect());
+	    DropDownMenu *menu = &this->menus[i];
+	
+	    if (menu->isOpen && menu->startedClick && menuClicked)
+	    {
+		SDL_Rect tempRect = menu->getRect();
+		int selectedY = (mousePos.y - tempRect.y)/menu->items[0].pos.h;
+		if (selectedY == 0)
+		{
+		    menu->isOpen = false;
+		    menu->startedClick = false;
+		}
+	    }
+	    else if (!menu->isOpen && menu->startedClick && menuClicked)
+	    {
+		menu->isOpen = true;
+	    }
+	    else if (menu->isOpen)
+	    {
+		menu->isOpen = false;
+	    }
+	}
+    }
+}
+
 #include "SDL_ttf.h"
 /* TODO(denis):
  *   to dos:
- *     -potentially have multiple different fonts open and render for rendering
- *      and when you call a draw with a different font size or font name than is saved
- *      a new font is dynamically created and saved for later
  *     -have a "flush fonts" function that deletes any fonts currently open to prevent
  *      clutter (or maybe dynamically decide when to delete fonts by keeping  counter
  *      of how many calls since they were used?)
@@ -591,6 +661,20 @@ DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
     return result;
 }
 
+MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 backgroundColour,
+			 Uint32 textColour)
+{
+    MenuBar result = {};
+    result.topLeft.x = x;
+    result.topLeft.y = y;
+    result.botRight.x = x+width;
+    result.botRight.y = y+height;
+    result.colour = backgroundColour;
+    result.textColour = textColour;
+    
+    return result;
+}
+
 // NOTE(denis): all the drawing functions
 
 void ui_draw()
@@ -744,5 +828,21 @@ void ui_draw(DropDownMenu *dropDownMenu)
 	    }
 	    ui_draw(&dropDownMenu->items[0]);
 	}
+    }
+}
+
+void ui_draw(MenuBar *menuBar)
+{
+    int menuWidth = menuBar->botRight.x - menuBar->topLeft.x;
+    int menuHeight = menuBar->botRight.y - menuBar->topLeft.y;
+    
+    SDL_Color colour = hexColourToRGBA(menuBar->colour);
+    SDL_SetRenderDrawColor(_renderer, colour.r, colour.g, colour.b, colour.a);
+    SDL_Rect rect = {menuBar->topLeft.x, menuBar->topLeft.y, menuWidth, menuHeight};
+    SDL_RenderFillRect(_renderer, &rect);
+    
+    for (int i = 0; i < menuBar->menuCount; ++i)
+    {
+	ui_draw(&menuBar->menus[i]);
     }
 }

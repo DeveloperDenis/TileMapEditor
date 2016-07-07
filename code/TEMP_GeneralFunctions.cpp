@@ -21,43 +21,6 @@ static inline int convertStringToInt(char string[], int size)
     return result;
 }
 
-//NOTE(denis): assumes the char array is a valid string
-static bool charInArray(char c, char array[])
-{
-    bool result = false;
-
-    if (array != NULL)
-    {
-	for (int i = 0; array[i] != 0 && !result; ++i)
-	{
-	    if (array[i] == c)
-		result = true;
-	}
-    }
-    
-    return result;
-}
-
-//NOTE(denis): only works for valid strings
-static bool stringsEqual(char *A, char *B)
-{
-    bool result = true;
-
-    int charIndex = 0;
-    while (A[charIndex] != 0 && B[charIndex] != 0 && result)
-    {
-	if (A[charIndex] != B[charIndex])
-	    result = false;
-	
-	++charIndex;
-    }
-
-    if (A[charIndex] != B[charIndex])
-	result = false;
-    
-    return result;
-}
-
 static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
 					     int width, int height, Uint32 colour)
 {
@@ -88,5 +51,18 @@ static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
     SDL_GetClipRect(tempSurf, &result.pos);
     SDL_FreeSurface(tempSurf);
     
+    return result;
+}
+
+static SDL_Color hexColourToRGBA(Uint32 hex)
+{
+    SDL_Color result = {};
+
+    //NOTE(denis): hex colour format 0xAARRGGBB
+    result.r = (hex >> 16) & 0xFF;
+    result.g = (hex >> 8) & 0xFF;
+    result.b = hex & 0xFF;
+    result.a = hex >> 24;
+
     return result;
 }
