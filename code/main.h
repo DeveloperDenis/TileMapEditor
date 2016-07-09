@@ -1,9 +1,10 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#include "SDL_rect.h"
+#undef max
 #include "denis_meta.h"
 #include "denis_math.h"
-#include "SDL_rect.h"
 
 struct SDL_Texture;
 
@@ -43,6 +44,13 @@ struct TexturedRect
 {
     SDL_Texture* image;
     SDL_Rect pos;
+
+    int getWidth() { return this->pos.w; };
+    void setPosition(Vector2 newPos)
+    {
+	this->pos.x = newPos.x;
+	this->pos.y = newPos.y;
+    }
 };
 
 #endif

@@ -5,14 +5,88 @@
 
 #include "denis_adt.h"
 
+int UIElement::getWidth()
+{
+    int width = 0;
+    
+    switch(this->type)
+    {
+	case UI_TEXTFIELD:
+	    width = this->textField->getWidth();
+	    break;
+
+	case UI_EDITTEXT:
+	    width = this->editText->getWidth();
+	    break;
+
+	case UI_BUTTON:
+	    width = this->button->getWidth();
+	    break;
+
+	case UI_TEXTBOX:
+	    width = this->textBox->getWidth();
+	    break;
+
+	case UI_DROPDOWNMENU:
+	    width = this->dropDownMenu->getWidth();
+	    break;
+    }
+
+    return width;
+}
+
+void UIElement::setPosition(Vector2 newPos)
+{
+    switch(this->type)
+    {
+	case UI_TEXTFIELD:
+	    this->textField->setPosition(newPos);
+	    break;
+
+	case UI_EDITTEXT:
+	    this->editText->setPosition(newPos);
+	    break;
+
+	case UI_BUTTON:
+	    this->button->setPosition(newPos);
+	    break;
+
+	case UI_TEXTBOX:
+	    this->textBox->setPosition(newPos);
+	    break;
+
+	case UI_DROPDOWNMENU:
+	    this->dropDownMenu->setPosition(newPos);
+	    break;
+    }
+}
+
+void EditText::setPosition(Vector2 newPos)
+{
+    this->pos.x = newPos.x;
+    this->pos.y = newPos.y;
+    
+    for (int i = 0; i < this->letterCount; ++i)
+    {
+	int x = newPos.x + i*this->letters[0].pos.w;
+	int y = newPos.y;
+	this->letters[i].setPosition({x,y});
+    }
+}
+
 void Button::setPosition(Vector2 newPos)
 {
     this->background.pos.x = newPos.x;
     this->background.pos.y = newPos.y;
 
-    //TODO(denis): if centre/right/left aligned I would want to change this
-    this->foreground.pos.x = newPos.x;
-    this->foreground.pos.y = newPos.y;
+    if (this->foreground.image)
+    {
+	int x = newPos.x + this->background.pos.w/2 - this->foreground.pos.w/2;
+	int y = newPos.y + this->background.pos.h/2 - this->foreground.pos.h/2;
+	
+	this->foreground.pos.x = x;
+	this->foreground.pos.y = y;
+    }
 }
 
 void Button::destroy()
@@ -55,6 +129,12 @@ SDL_Rect DropDownMenu::getRect()
     return result;
 }
 
+void DropDownMenu::setPosition(Vector2 newPos)
+{
+    this->items[0].pos.x = newPos.x;
+    this->items[0].pos.y = newPos.y;
+}
+
 void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
 {
     int height = this->botRight.y - this->topLeft.y;
@@ -88,7 +168,7 @@ void MenuBar::onMouseMove(Vector2 mousePos)
 }
 
 void MenuBar::onMouseDown(Vector2 mousePos, Uint8 button)
-{
+{   
     for (int i = 0; i < this->menuCount; ++i)
     {
 	if (button == SDL_BUTTON_LEFT)
@@ -97,8 +177,10 @@ void MenuBar::onMouseDown(Vector2 mousePos, Uint8 button)
     }
 }
 
-void MenuBar::onMouseUp(Vector2 mousePos, Uint8 button)
+bool MenuBar::onMouseUp(Vector2 mousePos, Uint8 button)
 {
+    bool processed = false;
+    
     for (int i = 0; i < this->menuCount; ++i)
     {
 	if (button == SDL_BUTTON_LEFT)
@@ -115,17 +197,22 @@ void MenuBar::onMouseUp(Vector2 mousePos, Uint8 button)
 		    menu->isOpen = false;
 		    menu->startedClick = false;
 		}
+		processed = true;
 	    }
 	    else if (!menu->isOpen && menu->startedClick && menuClicked)
 	    {
 		menu->isOpen = true;
+		processed = true;
 	    }
 	    else if (menu->isOpen)
 	    {
 		menu->isOpen = false;
+		processed = true;
 	    }
 	}
     }
+
+    return processed;
 }
 
 #include "SDL_ttf.h"
@@ -146,9 +233,6 @@ static int _selectedFont;
 
 static TextCursor _cursor;
 
-static LinkedList _groups;
-static int _currentID;
-
 static void ui_delete(LinkedList *ll)
 {
     Node *current = ll->front;
@@ -158,10 +242,6 @@ static void ui_delete(LinkedList *ll)
 	//TODO(denis): put this in a ui_delete(UIElement *) function?
 	switch(current->data.type)
 	{
-	    case UI_LINKEDLIST:
-		ui_delete(current->data.ll);
-		break;
-
 	    case UI_TEXTFIELD:
 		ui_delete(current->data.textField);
 		break;
@@ -176,6 +256,10 @@ static void ui_delete(LinkedList *ll)
 
 	    case UI_TEXTBOX:
 		ui_delete(current->data.textBox);
+		break;
+
+	    case UI_DROPDOWNMENU:
+		ui_delete(current->data.dropDownMenu);
 		break;
 	}
 
@@ -196,31 +280,22 @@ static void resetCursorPosition(EditText *editText)
 	_cursor.pos.x -= editText->letters[editText->letterCount-1].pos.w;
 }
 
-//NOTE(denis): only one EditText can be selected per group
-static EditText* getSelectedEditText(int groupID)
+//NOTE(denis): only one EditText can be selected per panel
+static EditText* getSelectedEditText(UIPanel *panel)
 {
     EditText *result = NULL;
-    Node *current = _groups.front;
-
-    while (current != NULL && current->data.ll->id != groupID)
+    Node *current = panel->panelElements->front;
+    
+    while (current != NULL && !result)
     {
-	current = current->next;
-    }
-
-    if (current != NULL)
-    {
-	current = current->data.ll->front;
-	while (current != NULL && !result)
+	if (current->data.type == UI_EDITTEXT)
 	{
-	    if (current->data.type == UI_EDITTEXT)
-	    {
-		EditText *editText = current->data.editText;
-		result = editText->selected ? editText : NULL;
-	    }
-
-	    current = current->next;
+	    EditText *editText = current->data.editText;
+	    result = editText->selected ? editText : NULL;
 	}
-    }
+
+	current = current->next;
+    }    
 
     return result;
 }
@@ -250,8 +325,6 @@ bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize)
         _cursor.pos.h = 15;
         _cursor.flashRate = 300;
         _cursor.visible = true;
-
-	_currentID = 1;
 	
 	result = true;
     }
@@ -261,8 +334,6 @@ bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize)
 
 void ui_destroy()
 {
-    ui_delete(&_groups);
-
     for (int i = 0; i < _fontsLength; ++i)
     {
 	TTF_CloseFont(_fonts[i]);
@@ -308,64 +379,66 @@ bool ui_wasClicked(Button button, Vector2 mouse)
     return pointInRect(mouse, button.background.pos) && button.startedClick;
 }
 
-void ui_processMouseDown(Vector2 mousePos, Uint8 button)
+bool ui_processMouseDown(UIPanel *panel, Vector2 mousePos, Uint8 button)
 {
-    Node *currentRoot = _groups.front;
-    Node *currentGroup = NULL;
-
-    while (currentRoot != NULL)
+    bool processed = false;
+    
+    if (panel && panel->panelElements)
     {
-	currentGroup = currentRoot->data.ll->front;
+	Node *current = panel->panelElements->front;
 
-	while (currentGroup != NULL)
+	while (current != NULL)
 	{
 	    if (button == SDL_BUTTON_LEFT)
 	    {
-		if (currentGroup->data.type == UI_BUTTON)
+		if (current->data.type == UI_BUTTON)
 		{
-		    Button *data = currentGroup->data.button;
+		    Button *data = current->data.button;
 		    data->startedClick = pointInRect(mousePos, data->background.pos);
+
+		    if (data->startedClick)
+			processed = true;
 		}
 	    }
 	    
-	    currentGroup = currentGroup->next;
+	    current = current->next;
 	}
-
-	currentRoot = currentRoot->next;
     }
+
+    return processed;
 }
 
-void ui_processMouseUp(Vector2 mousePos, Uint8 button)
+bool ui_processMouseUp(UIPanel *panel, Vector2 mousePos, Uint8 button)
 {
-    Node *currentRoot = _groups.front;
-    Node *currentGroup = NULL;
+    bool processed = false;
     
-    while(currentRoot != 0)
+    if (panel && panel->panelElements)
     {
-	currentGroup = currentRoot->data.ll->front;
+	Node *current = panel->panelElements->front;
 
-	while (currentGroup != 0)
+	while (current != 0)
 	{
 	    if (button == SDL_BUTTON_LEFT)
 	    {
-		if (currentGroup->data.type == UI_EDITTEXT)
+		if (current->data.type == UI_EDITTEXT)
 		{
-		    EditText *data = currentGroup->data.editText;
+		    EditText *data = current->data.editText;
 		    data->selected = pointInRect(mousePos, data->pos);
 
 		    if (data->selected)
 		    {
 			resetCursorPosition(data);
 			_cursor.flashCounter = 0;
+			processed = true;
 		    }
 		}
 	    }
 
-	    currentGroup = currentGroup->next;
+	    current = current->next;
 	}
-
-	currentRoot = currentRoot->next;
     }
+
+    return processed;
 }
 
 void ui_addLetterTo(EditText *editText, char c)
@@ -388,9 +461,9 @@ void ui_addLetterTo(EditText *editText, char c)
     }
 }
 
-void ui_processLetterTyped(char c, int groupID)
+void ui_processLetterTyped(char c, UIPanel *panel)
 {
-    EditText *editText = getSelectedEditText(groupID);
+    EditText *editText = getSelectedEditText(panel);
 
     if (editText)
 	ui_addLetterTo(editText, c);
@@ -407,123 +480,95 @@ void ui_eraseLetter(EditText *editText)
     }
 }
 
-void ui_eraseLetter(int groupID)
+void ui_eraseLetter(UIPanel *panel)
 {
-    EditText *editText = getSelectedEditText(groupID);
+    EditText *editText = getSelectedEditText(panel);
     
     if (editText)
 	ui_eraseLetter(editText);
 }
 
-static int addToGroup(UIElement data, int groupID)
+static void addToPanel(UIElement data, UIPanel *panel)
 {
-    int result = groupID;
-    
-    Node *current = _groups.front;
-    
-    while (current != NULL && current->data.type == UI_LINKEDLIST &&
-	   current->data.ll->id != groupID)
+    if (!panel->panelElements)
     {
-	current = current->next;
+	panel->panelElements = (LinkedList *)malloc(sizeof(panel->panelElements));
+	panel->panelElements->front = 0;
     }
-    
-    if (current != NULL && current->data.type == UI_LINKEDLIST)
-    {
-	adt_addTo(current->data.ll, data);
-    }
-    else
-    {
-	result = _currentID++;
-
-	UIElement newLL = {};
-	newLL.type = UI_LINKEDLIST;
-	newLL.ll = (LinkedList *)malloc(sizeof(LinkedList));
-        newLL.ll->front = NULL;
-	newLL.ll->id = result;
-	    
-	adt_addTo(&_groups, newLL);
-	adt_addTo(newLL.ll, data);
-    }
-
-    return result;
+	
+    adt_addTo(panel->panelElements, data);
 }
 
-int ui_addToGroup(EditText *editText)
+UIPanel ui_addToPanel(EditText *editText)
 {
-    return ui_addToGroup(editText, 0);
+    UIPanel newPanel = {};
+    ui_addToPanel(editText, &newPanel);
+    
+    return newPanel;
 }
 
-int ui_addToGroup(EditText *editText, int groupID)
+void ui_addToPanel(EditText *editText, UIPanel *panel)
 {
     UIElement data = {};
     data.type = UI_EDITTEXT;
     data.editText = editText;
 
-    return addToGroup(data, groupID);    
+    addToPanel(data, panel);
 }
 
-int ui_addToGroup(TexturedRect *textField)
+UIPanel ui_addToPanel(TexturedRect *textField)
 {
-    return ui_addToGroup(textField, 0);
+    UIPanel newPanel = {};
+    ui_addToPanel(textField, &newPanel);
+
+    return newPanel;
 }
-int ui_addToGroup(TexturedRect *textField, int groupID)
+void ui_addToPanel(TexturedRect *textField, UIPanel *panel)
 {
     UIElement data = {};
     data.type = UI_TEXTFIELD;
     data.textField = textField;
 
-    return addToGroup(data, groupID);
+    addToPanel(data, panel);
 }
 
-int ui_addToGroup(Button *button)
+UIPanel ui_addToPanel(Button *button)
 {
-    return ui_addToGroup(button, 0);
+    UIPanel newPanel = {};
+    ui_addToPanel(button, &newPanel);
+    
+    return newPanel;
 }
-int ui_addToGroup(Button *button, int groupID)
+void ui_addToPanel(Button *button, UIPanel *panel)
 {
     UIElement data = {};
     data.type = UI_BUTTON;
     data.button = button;
 
-    return addToGroup(data, groupID);
+    addToPanel(data, panel);
 }
 
-int ui_addToGroup(TextBox *textBox)
+UIPanel ui_addToPanel(TextBox *textBox)
 {
-    return ui_addToGroup(textBox, 0);
+    UIPanel newPanel = {};
+    ui_addToPanel(textBox, &newPanel);
+    
+    return newPanel;
 }
-int ui_addToGroup(TextBox *textBox, int groupID)
+void ui_addToPanel(TextBox *textBox, UIPanel *panel)
 {
     UIElement data = {};
     data.type = UI_TEXTBOX;
     data.textBox = textBox;
 
-    return addToGroup(data, groupID);
+    addToPanel(data, panel);
 }
 
-//TODO(denis): also have a "clear group" function that doesn't delete the group?
-//TODO(denis): I don't think this deletes properly
-void ui_deleteGroup(int groupID)
+void ui_delete(UIPanel *panel)
 {
-    Node *current = _groups.front;
-    Node *prev = NULL;
-
-    while (current != NULL && current->data.ll->id != groupID)
-    {
-	prev = current;
-	current = current->next;
-    }
-
-    if (current != NULL)
-    {
-	if (prev)
-	    prev->next = current->next;
-	else
-	    _groups = {};
-
-	ui_delete(current->data.ll);
-	free(current);
-    }
+    ui_delete(panel->panelElements);
+    free(panel->panelElements);
+    panel->panelElements = 0;
 }
 
 void ui_delete(TexturedRect *texturedRect)
@@ -556,6 +601,21 @@ void ui_delete(TextBox *textBox)
     textBox->background = 0;
     textBox->text = {};
     textBox->pos = {};
+}
+
+void ui_delete(DropDownMenu *dropDownMenu)
+{
+    for (int i = 0; i < dropDownMenu->itemCount; ++i)
+    {
+	ui_delete(&dropDownMenu->items[i]);
+    }
+
+    SDL_DestroyTexture(dropDownMenu->unselectedTexture);
+    SDL_DestroyTexture(dropDownMenu->selectionBox);
+
+    dropDownMenu->itemCount = 0;
+    dropDownMenu->isOpen = false;
+    dropDownMenu->startedClick = false;
 }
 
 //TODO(denis): perhaps have multiple versions that do a different kind of
@@ -618,11 +678,14 @@ Button ui_createTextButton(char *text, SDL_Colour textColour,
     Button result = {};
 
     result.text = text;
-    result.background = createFilledTexturedRect(_renderer, width, height, backgroundColour);
+    result.foreground = ui_createTextField(text, 0, 0, textColour);
+    
+    int bgWidth = max(width, result.foreground.pos.w) + 5;
+    int bgHeight = max(height, result.foreground.pos.h) + 5;
+    result.background = createFilledTexturedRect(_renderer, bgWidth, bgHeight,
+						 backgroundColour);
 
-    //TODO(denis): add options for left align, centre aligned, and right aligned text
-    result.foreground = ui_createTextField(text, result.background.pos.x,
-					result.background.pos.y, textColour);
+    result.setPosition({0,0});
     
     return result;
 }
@@ -675,70 +738,123 @@ MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 backgroundC
     return result;
 }
 
+UIPanel ui_createPanel(int x, int y, int width, int height, Uint32 colour)
+{
+    UIPanel result = {};
+    result.visible = true;
+    
+    result.panel = createFilledTexturedRect(_renderer, width, height, colour);
+
+    result.panel.pos.x = x;
+    result.panel.pos.y = y;
+
+    return result;
+}
+
+UIElement ui_packIntoUIElement(EditText *editText)
+{
+    UIElement result = {};
+    result.type = UI_EDITTEXT;
+    result.editText = editText;
+    return result;
+}
+UIElement ui_packIntoUIElement(TexturedRect *texturedRect)
+{
+    UIElement result = {};
+    result.type = UI_TEXTFIELD;
+    result.textField = texturedRect;
+    return result;
+}
+UIElement ui_packIntoUIElement(Button *button)
+{
+    UIElement result = {};
+    result.type = UI_BUTTON;
+    result.button = button;
+    return result;
+}
+UIElement ui_packIntoUIElement(TextBox *textBox)
+{
+    UIElement result = {};
+    result.type = UI_TEXTBOX;
+    result.textBox = textBox;
+    return result;
+}
+UIElement ui_packIntoUIElement(DropDownMenu *dropDownMenu)
+{
+    UIElement result = {};
+    result.type = UI_DROPDOWNMENU;
+    result.dropDownMenu = dropDownMenu;
+    return result;
+}
+
 // NOTE(denis): all the drawing functions
 
-void ui_draw()
+void ui_draw(UIPanel *panel)
 {
     bool editTextSelected = false;
-    
-    Node *currentRoot = _groups.front;
-    Node *currentGroup = NULL;
-    
-    while (currentRoot != 0)
+
+    if (panel->visible)
     {
-	currentGroup = currentRoot->data.ll->front;
-	while (currentGroup != NULL)
+	if (panel->panel.image)
 	{
-	    switch (currentGroup->data.type)
+	    SDL_RenderCopy(_renderer, panel->panel.image, NULL, &panel->panel.pos);
+	}
+	
+	if (panel && panel->panelElements)
+	{
+	    Node *current = panel->panelElements->front;
+    
+	    while (current != NULL)
 	    {
-		case UI_TEXTFIELD:
-		    ui_draw(currentGroup->data.textField);
-		    break;
+		switch (current->data.type)
+		{
+		    case UI_TEXTFIELD:
+			ui_draw(current->data.textField);
+			break;
 
-		case UI_EDITTEXT:
-		    if (currentGroup->data.editText->selected)
-		    {
-			editTextSelected = true;
-			resetCursorPosition(currentGroup->data.editText);
-		    }
+		    case UI_EDITTEXT:
+			if (current->data.editText->selected)
+			{
+			    editTextSelected = true;
+			    resetCursorPosition(current->data.editText);
+			}
 		    
-		    ui_draw(currentGroup->data.editText);
-		    break;
+			ui_draw(current->data.editText);
+			break;
 
-		case UI_TEXTBOX:
-		    ui_draw(currentGroup->data.textBox);
-		    break;
+		    case UI_TEXTBOX:
+			ui_draw(current->data.textBox);
+			break;
 		    
-		case UI_BUTTON:
-		    ui_draw(currentGroup->data.button);
-		    break;
+		    case UI_BUTTON:
+			ui_draw(current->data.button);
+			break;
 
-		case UI_DROPDOWNMENU:
-		    ui_draw(currentGroup->data.dropDownMenu);
-		    break;
+		    case UI_DROPDOWNMENU:
+			ui_draw(current->data.dropDownMenu);
+			break;
+		}
+
+		current = current->next;
 	    }
-	    
-	    currentGroup = currentGroup->next;
 	}
 
-	currentRoot = currentRoot->next;
-    }
-
-    if (editTextSelected)
-    {
-	if (_cursor.flashCounter >= _cursor.flashRate)
+	if (editTextSelected)
 	{
-	    //TODO(denis): don't hardcode this, probably
-	    SDL_SetRenderDrawColor(_renderer, 140,140,140,255);
-	    SDL_RenderFillRect(_renderer, &_cursor.pos);
-	    _cursor.visible = false;
+	    if (_cursor.flashCounter >= _cursor.flashRate)
+	    {
+		//TODO(denis): don't hardcode this, probably
+		SDL_SetRenderDrawColor(_renderer, 140,140,140,255);
+		SDL_RenderFillRect(_renderer, &_cursor.pos);
+		_cursor.visible = false;
+	    }
+	    if (!_cursor.visible && _cursor.flashCounter >= _cursor.flashRate*2)
+	    {
+		_cursor.visible = true;
+		_cursor.flashCounter = 0;
+	    }
+	    ++_cursor.flashCounter;
 	}
-	if (!_cursor.visible && _cursor.flashCounter >= _cursor.flashRate*2)
-	{
-	    _cursor.visible = true;
-	    _cursor.flashCounter = 0;
-	}
-	++_cursor.flashCounter;
     }
 }
 

@@ -13,6 +13,8 @@ typedef int16_t int16;
 typedef int32_t int32;
 typedef int64_t int64;
 
+#define max(val1, val2) ((val1) > (val2) ? (val1) : (val2))
+
 //NOTE(denis): assumes the char array is a valid string
 static bool charInArray(char c, char array[])
 {

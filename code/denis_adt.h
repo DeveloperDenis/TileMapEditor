@@ -11,10 +11,7 @@ struct Node
 };
 
 struct LinkedList
-{
-    //TODO(denis): dunno about this id thing
-    int id;
-    
+{   
     Node *front;
 };
 

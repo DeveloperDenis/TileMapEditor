@@ -1,0 +1,28 @@
+#ifndef NEW_TILE_MAP_PANEL_H_
+#define NEW_TILE_MAP_PANEL_H_
+
+struct NewTileMapPanelData
+{
+    char *tileMapName;
+    int tileSize;
+    int widthInTiles;
+    int heightInTiles;
+};
+
+void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight);
+
+void newTileMapPanelRespondToMouseDown(Vector2 mousePos, uint8 mouseButton);
+void newTileMapPanelRespondToMouseUp(Vector2 mousePos, uint8 mouseButton);
+
+void newTileMapPanelCharInput(char c);
+void newTileMapPanelCharDeleted();
+
+bool newTileMapPanelVisible();
+void newTileMapPanelSetVisible(bool newValue);
+
+bool newTileMapPanelDataReady();
+NewTileMapPanelData* newTileMapPanelGetData();
+
+void newTileMapPanelDraw();
+
+#endif

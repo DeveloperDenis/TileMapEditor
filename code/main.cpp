@@ -29,6 +29,7 @@
 #include "file_saving_loading.h"
 #include "denis_math.h"
 #include "TEMP_GeneralFunctions.cpp"
+#include "new_tile_map_panel.h"
 
 #include "ui_elements.h"
 
@@ -97,31 +98,6 @@ static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tile
     *menuX = tileMap->offset.x + 10;
 }
 
-static void fillBWithAConverted(float conversionFactor, EditText *A, EditText *B)
-{
-    int numberA = convertStringToInt(A->text, A->letterCount);
-    int numberB = (int)(numberA*conversionFactor);
-
-    while (B->letterCount > 0)
-        ui_eraseLetter(B);
-
-    
-    int digitsB = 0;
-    int tempB = numberB;
-    while (tempB > 0)
-    {
-	tempB /= 10;
-	++digitsB;
-    }
-
-    for (int i = 0; i < digitsB; ++i)
-    {
-	//TODO(denis): this calculation is probably pretty inefficient
-	char letter = (char)(numberB % exponent(10, digitsB-i) / exponent(10, digitsB-i-1)) + '0';
-	ui_addLetterTo(B, letter);
-    }
-}
-
 int main(int argc, char* argv[])
 {
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
@@ -151,6 +127,7 @@ int main(int argc, char* argv[])
 	    
 	    char *tileSetFileName = "some_tiles.png";
 	    Button currentTileSet = {};
+	    Button saveButton = {};
 	    
 	    char *tileMapName = NULL;
 
@@ -162,77 +139,7 @@ int main(int argc, char* argv[])
 	    TexturedRect selectionBox = {};
 	    TexturedRect selectedTile = {};
 
-	    int newTileMapGroup = 0;
-
-	    TexturedRect tileMapNameText =
-		ui_createTextField("Tile Map Name: ", 100, 100, COLOUR_WHITE);
-	    newTileMapGroup = ui_addToGroup(&tileMapNameText);
-
-	    TexturedRect tileSizeText =
-		ui_createTextField("Tile Size: ", 100, 150, COLOUR_WHITE);
-	    ui_addToGroup(&tileSizeText, newTileMapGroup);
-	    
-	    TexturedRect widthText =
-		ui_createTextField("Width: ", 100, 200, COLOUR_WHITE);
-	    ui_addToGroup(&widthText, newTileMapGroup);
-	    
-	    TexturedRect pixelsText =
-		ui_createTextField("pixels", 455, 200, COLOUR_WHITE);
-	    ui_addToGroup(&pixelsText, newTileMapGroup);
-	    
-	    TexturedRect tilesText =
-		ui_createTextField("tiles", 760, 200, COLOUR_WHITE);
-	    ui_addToGroup(&tilesText, newTileMapGroup);
-	    
-	    TexturedRect heightText =
-		ui_createTextField("Height: ", 100, 250, COLOUR_WHITE);
-	    ui_addToGroup(&heightText, newTileMapGroup);
-	    
-	    TexturedRect pixelsText2 =
-		ui_createTextField("pixels", 455, 250, COLOUR_WHITE);
-	    ui_addToGroup(&pixelsText2, newTileMapGroup);
-	    
-	    TexturedRect tilesText2 =
-		ui_createTextField("tiles", 760, 250, COLOUR_WHITE);
-	    ui_addToGroup(&tilesText2, newTileMapGroup);
-	    
-	    char numberChars[] =  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0};
-	    
-	    EditText tileMapNameEditText =
-		ui_createEditText(250, 100, 200, 20, COLOUR_WHITE, 2);
-	    newTileMapGroup = ui_addToGroup(&tileMapNameEditText);
-	    
-	    EditText tileSizeEditText =
-		ui_createEditText(250, 150, 200, 20, COLOUR_WHITE, 2);
-	    tileSizeEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&tileSizeEditText, newTileMapGroup);
-	    
-	    EditText widthPxEditText =
-		ui_createEditText(250, 200, 200, 20, COLOUR_WHITE,  2);
-	    widthPxEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&widthPxEditText, newTileMapGroup);
-	    
-	    EditText widthTilesEditText =
-		ui_createEditText(550, 200, 200, 20, COLOUR_WHITE, 2);
-	    widthTilesEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&widthTilesEditText, newTileMapGroup);
-	    
-	    EditText heightPxEditText =
-		ui_createEditText(250, 250, 200, 20, COLOUR_WHITE, 2);
-	    heightPxEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&heightPxEditText, newTileMapGroup);
-	    
-	    EditText heightTilesEditText =
-		ui_createEditText(550, 250, 200, 20, COLOUR_WHITE, 2);
-	    heightTilesEditText.allowedCharacters = numberChars;
-	    ui_addToGroup(&heightTilesEditText, newTileMapGroup);
-	    
-	    Button newTileMapButton =
-		ui_createTextButton("Create New Map", COLOUR_WHITE,
-				    200, 100, 0xFFFF0000);
-	    newTileMapButton.setPosition({500, 500});
-	    ui_addToGroup(&newTileMapButton, newTileMapGroup);
-
+	    //NOTE(denis): setting up the top bar
 	    ui_setFont(menuFontName, menuFontSize);
 
 	    MenuBar topMenuBar = ui_createMenuBar(0, 0, WINDOW_WIDTH, 20,
@@ -259,8 +166,14 @@ int main(int argc, char* argv[])
 
 	    ui_setFont(defaultFontName, defaultFontSize);
 	    
-	    Button saveButton = {};
-	    
+	    //TODO(denis): use the window dimenensions to decide width and height
+	    // and use the topMenuBar to position this
+	    {
+		int centreX = WINDOW_WIDTH/2;
+		int centreY = WINDOW_HEIGHT/2;
+		createNewTileMapPanel(centreX, centreY, 0, 0);
+	    }
+		
 	    const enum { PAINT_TOOL,
 		   FILL_TOOL
 	    };
@@ -310,6 +223,9 @@ int main(int argc, char* argv[])
 					row += tileMap.widthInTiles;
 				    }
 				}
+
+				//TODO(denis): might want to resize the new tile map
+				// panel here
 			    }
 			    
 			} break;
@@ -322,7 +238,6 @@ int main(int argc, char* argv[])
 			    Vector2 mouse = {event.motion.x, event.motion.y};
 
 			    topMenuBar.onMouseMove(mouse);
-
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
@@ -397,8 +312,9 @@ int main(int argc, char* argv[])
 			case SDL_MOUSEBUTTONDOWN:
 			{
 			    Vector2 mouse = {event.button.x, event.button.y};
-
-			    ui_processMouseDown(mouse, event.button.button);
+			    uint8 mouseButton = event.button.button;
+			    
+			    newTileMapPanelRespondToMouseDown(mouse, mouseButton); 
 			    
 			    //TODO(denis): replace this with the ui call
 			    fillToolIcon.startedClick = pointInRect(mouse, fillToolIcon.background.pos);
@@ -450,23 +366,29 @@ int main(int argc, char* argv[])
 			case SDL_MOUSEBUTTONUP:
 			{
 			    Vector2 mouse = {event.button.x, event.button.y};
+			    uint8 mouseButton = event.button.button;
+			    
+			    //TODO(denis): have a heirarchy of parts that detect mouse
+			    // clicks, if one ui element responds to a click, the
+			    // rest of the ui elements should be ignored
 
-			    ui_processMouseUp(mouse, event.button.button);
-			    
-			    topMenuBar.onMouseUp(mouse, event.button.button);
-			    
-			    if (ui_wasClicked(newTileMapButton, mouse))
+			    if (topMenuBar.onMouseUp(mouse, event.button.button))
 			    {
-				tileMapName = tileMapNameEditText.text;
+				//TODO(denis): top bar was clicked
+			    }
+			    else if (newTileMapPanelVisible())
+			    {
+				newTileMapPanelRespondToMouseUp(mouse, mouseButton);
 
-				tileMap.tileSize = (Uint32)convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
-			        tileMap.widthInTiles = (Uint32)convertStringToInt(widthTilesEditText.text, widthTilesEditText.letterCount);
-				tileMap.heightInTiles = (Uint32)convertStringToInt(heightTilesEditText.text, heightTilesEditText.letterCount);
-				
-				if (tileMapName && tileMap.tileSize != 0 &&
-				    tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
-				{   
-				    ui_deleteGroup(newTileMapGroup);
+				if (newTileMapPanelDataReady())
+				{
+				    NewTileMapPanelData* data =
+					newTileMapPanelGetData();
+				    newTileMapPanelSetVisible(false);
+
+				    tileMap.widthInTiles = data->widthInTiles;
+				    tileMap.heightInTiles = data->heightInTiles;
+				    tileMap.tileSize = data->tileSize;
 				    
 				    int memorySize = sizeof(Tile)*tileMap.widthInTiles*tileMap.heightInTiles;
 				    
@@ -512,7 +434,7 @@ int main(int argc, char* argv[])
 					}
 
 					currentTileSet.background = loadImage(renderer,
-								   tileSetFileName);
+									      tileSetFileName);
 
 					selectionBox = createFilledTexturedRect(
 					    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
@@ -521,10 +443,7 @@ int main(int argc, char* argv[])
 					saveButton = ui_createTextButton("Save", COLOUR_WHITE,
 									 100, 50, 0xFF33AA88);
 				    }
-				}
-				else
-				{
-				    OutputDebugStringA("you gotta fill it all out!\n");
+				    
 				}
 			    }
 			    
@@ -636,76 +555,16 @@ int main(int argc, char* argv[])
 			{
 			    char* theText = event.text.text;
 
-			    ui_processLetterTyped(theText[0], newTileMapGroup);
-			    
-			    int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
-			    
-			    if (tileSizeEditText.selected)
-			    {
-			        fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
-				fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
-			    }
-			    else if (tileSizeEditText.text[0] != 0)
-			    {
-				if (widthTilesEditText.text[0] != 0 ||
-				    widthPxEditText.text[0] != 0)
-				{
-				    if (widthTilesEditText.selected)
-				    {
-					fillBWithAConverted((float)tileSize, &widthTilesEditText, &widthPxEditText);
-				    }
-				    else if (widthPxEditText.selected)
-				    {
-				        fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
-				    }
-				}
-				if (heightTilesEditText.text[0]!=0 ||
-				    heightPxEditText.text[0] != 0)
-				{
-				    if (heightTilesEditText.selected)
-				    {
-					fillBWithAConverted((float)tileSize, &heightTilesEditText, &heightPxEditText);
-				    }
-				    else if (heightPxEditText.selected)
-				    {
-					fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
-				    }
-				}
-			    }
+			    if (newTileMapPanelVisible())
+				newTileMapPanelCharInput(theText[0]);
 			} break;
 
 			case SDL_KEYDOWN:
 			{
 			    if (event.key.keysym.sym == SDLK_BACKSPACE)
 			    {
-				ui_eraseLetter(newTileMapGroup);
-
-				int tileSize = convertStringToInt(tileSizeEditText.text, tileSizeEditText.letterCount);
-
-				if (tileSize != 0)
-				{
-				    if (tileSizeEditText.selected)
-				    {
-					fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
-					fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
-				    }
-				    else if (widthTilesEditText.selected)
-				    {
-					fillBWithAConverted((float)tileSize, &widthTilesEditText, &widthPxEditText);
-				    }
-				    else if (widthPxEditText.selected)
-				    {
-					fillBWithAConverted(1.0F/(float)tileSize, &widthPxEditText, &widthTilesEditText);
-				    }
-				    else if (heightTilesEditText.selected)
-				    {
-					fillBWithAConverted((float)tileSize, &heightTilesEditText, &heightPxEditText);
-				    }
-				    else if (heightPxEditText.selected)
-				    {
-					fillBWithAConverted(1.0F/(float)tileSize, &heightPxEditText, &heightTilesEditText);
-				    }
-				}
+				if (newTileMapPanelVisible())
+				    newTileMapPanelCharDeleted();
 			    }
 			} break;
 		    }
@@ -713,10 +572,9 @@ int main(int argc, char* argv[])
 
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
-		
-		ui_draw();
 
-		ui_draw(&topMenuBar);
+		newTileMapPanelDraw();
+		
 		ui_draw(&saveButton);
 
 		if (currentTileSet.background.image != NULL)
@@ -814,6 +672,8 @@ int main(int argc, char* argv[])
 			ui_draw(dropDown[selectedItem]);
 		    }
 		}
+
+		ui_draw(&topMenuBar);
 		
 		SDL_RenderPresent(renderer);
 	    }

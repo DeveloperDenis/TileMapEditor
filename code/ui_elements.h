@@ -14,7 +14,8 @@ struct Button
     char *text;
     TexturedRect foreground;
 
-    void setPosition(Vector2);
+    int getWidth() { return background.pos.w; };
+    void setPosition(Vector2 newPos);
     void destroy();
 };
 
@@ -32,7 +33,8 @@ struct TextBox
     TexturedRect text;
     SDL_Rect pos;
 
-    void setPosition(Vector2);
+    int getWidth() { return this->pos.w; };
+    void setPosition(Vector2 newPos);
 };
 
 struct EditText
@@ -50,6 +52,9 @@ struct EditText
     //TODO(denis): padding isn't used for anything
     int padding;
     bool selected;
+
+    int getWidth() { return this->pos.w; };
+    void setPosition(Vector2 newPos);
 };
 
 struct DropDownMenu
@@ -66,6 +71,8 @@ struct DropDownMenu
     bool startedClick;
     
     SDL_Rect getRect();
+    void setPosition(Vector2 newPos);
+    int getWidth() { return this->getRect().w; };
 };
 
 struct MenuBar
@@ -84,13 +91,13 @@ struct MenuBar
 
     void onMouseMove(Vector2 mousePos);
     void onMouseDown(Vector2 mousePos, Uint8 button);
-    void onMouseUp(Vector2 mousePos, Uint8 button);
+    bool onMouseUp(Vector2 mousePos, Uint8 button);
 };
 
-enum
+enum UIElementType
 {
-    UI_LINKEDLIST = 1,
-    UI_TEXTFIELD,
+    //TODO(denis): add UI_UIGROUP here?
+    UI_TEXTFIELD = 1,
     UI_EDITTEXT,
     UI_BUTTON,
     UI_TEXTBOX,
@@ -98,17 +105,27 @@ enum
 };
 struct UIElement
 {
-    int type;
+    UIElementType type;
     
     union
     {
-	LinkedList *ll;
+	//TODO(denis): add "UIGroup *group" here?
 	TexturedRect *textField;
 	TextBox *textBox;
 	EditText *editText;
 	Button *button;
 	DropDownMenu *dropDownMenu;
     };
+
+    int getWidth();
+    void setPosition(Vector2 newPos);
+};
+
+struct UIPanel
+{
+    LinkedList *panelElements;
+    bool visible;
+    TexturedRect panel;
 };
 
 bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize);
@@ -117,18 +134,18 @@ void ui_destroy();
 //NOTE(denis): returns false if the font was not found
 bool ui_setFont(char *fontName, int fontSize);
 
-void ui_processMouseDown(Vector2 mousePos, Uint8 button);
-void ui_processMouseUp(Vector2 mousePos, Uint8 button);
+bool ui_processMouseDown(UIPanel *group, Vector2 mousePos, Uint8 button);
+bool ui_processMouseUp(UIPanel *group, Vector2 mousePos, Uint8 button);
 //TODO(denis): might want something like this
 //void ui_processMouseMotion(Vector2 mousePos);
 
 bool ui_wasClicked(Button button, Vector2 mouse);
 
 void ui_addLetterTo(EditText *editText, char c);
-void ui_processLetterTyped(char c, int groupID);
+void ui_processLetterTyped(char c, UIPanel *group);
 
-//NOTE(denis): erases a letter from the currently selected EditText
-void ui_eraseLetter(int groupID);
+//NOTE(denis): erases a letter from the currently selected EditText in the group
+void ui_eraseLetter(UIPanel *panel);
 //NOTE(denis): erases a letter from the given EditText
 void ui_eraseLetter(EditText *editText);
 
@@ -137,6 +154,8 @@ TextBox ui_createTextBox(char *text, int minWidth, int minHeight, SDL_Color text
 			 Uint32 backgroundColour);
 EditText ui_createEditText(int x, int y, int width, int height,
 			   SDL_Color backgroundColour, int padding);
+//NOTE(denis): if the text area is larger than the given width or height, the
+// button will be made as big as needed to hold all the text
 Button ui_createTextButton(char *text, SDL_Color textColour, int width, int height,
 			   Uint32 backgroundColour);
 Button ui_createImageButton(char *imageFileName);
@@ -145,29 +164,33 @@ DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
 				   SDL_Color textColour, Uint32 backgroundColour);
 MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 colour,
 			 Uint32 textColour);
+UIPanel ui_createPanel(int x, int y, int width, int height, Uint32 colour);
+//NOTE(denis): if you don't pass a panel, it returns a new panel containing the item
+// you added
+UIPanel ui_addToPanel(EditText *editText);
+void ui_addToPanel(EditText *editText, UIPanel *panel);
+UIPanel ui_addToPanel(TexturedRect *textField);
+void ui_addToPanel(TexturedRect *textField, UIPanel *panel);
+UIPanel ui_addToPanel(Button *button);
+void ui_addToPanel(Button *button, UIPanel *panel);
+UIPanel ui_addToPanel(TextBox *textBox);
+void ui_addToPanel(TextBox *textBox, UIPanel *panel);
 
-//NOTE(denis): these functions return the id of the group the data was added to
-// for functions with two parameters the id may differ from the passed in ID if that
-// ID does not exist, in that case the returned ID is for new group made
-//TODO(denis): maybe the id entered should be presevered even if it doesn't yet exist?
-int ui_addToGroup(EditText *editText);
-int ui_addToGroup(EditText *editText, int groupID);
-int ui_addToGroup(TexturedRect *textField);
-int ui_addToGroup(TexturedRect *textField, int groupID);
-int ui_addToGroup(Button *button);
-int ui_addToGroup(Button *button, int groupID);
-int ui_addToGroup(TextBox *textBox);
-int ui_addToGroup(TextBox *textBox, int groupID);
+//TODO(denis): templates?
+UIElement ui_packIntoUIElement(EditText *editText);
+UIElement ui_packIntoUIElement(TexturedRect *texturedRect);
+UIElement ui_packIntoUIElement(Button *button);
+UIElement ui_packIntoUIElement(TextBox *textBox);
+UIElement ui_packIntoUIElement(DropDownMenu *dropDownMenu);
 
-void ui_deleteGroup(int groupID);
+void ui_delete(UIPanel *panel);
 void ui_delete(TexturedRect *TexturedRect);
 void ui_delete(EditText *editText);
 void ui_delete(Button *button);
 void ui_delete(TextBox *textBox);
+void ui_delete(DropDownMenu *dropDownMenu);
 
-//NOTE(denis): general draw function that draws any elements in groups
-void ui_draw();
-
+void ui_draw(UIPanel *panel);
 void ui_draw(Button *button);
 void ui_draw(TexturedRect *texturedRect);
 void ui_draw(EditText *editText);
