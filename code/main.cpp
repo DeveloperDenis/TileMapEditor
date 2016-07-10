@@ -1,10 +1,6 @@
 /* TODO(denis):
  * in the beginning, check the resolution of the user's monitor, and don't allow them
  * to make tile maps that would be too big!
-
- * Additionally, I think it would be cool if when you pressed TAB, your selected 
- * EditText changed to the next logical EditText
- * same with hitting Shift+TAB, it should make you select the previous text box
  *
  * add tile set loading
  *
@@ -76,12 +72,13 @@ static bool moveSelectionBox(TexturedRect *selectionBox, Vector2 mouse,
     return shouldBeDrawn;
 }
 
-static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tileMap, int padding,
+static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tileMap,
 				int *menuX, int *menuY)
 {   
     int widthSpace = windowWidth - tileMap->tileSize*tileMap->widthInTiles;
     int heightSpace = windowHeight - tileMap->tileSize*tileMap->heightInTiles;
 
+    int padding = 30;
     if (widthSpace > heightSpace)
     {
 	int offsetY = windowHeight/2 - tileMap->tileSize*tileMap->heightInTiles/2;
@@ -96,6 +93,51 @@ static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tile
     //TODO(denis): hard-coding not good
     *menuY = tileMap->offset.y - 50;
     *menuX = tileMap->offset.x + 10;
+}
+
+static TileMap createNewTileMap(int startX, int startY)
+{
+    TileMap newTileMap = {};
+    newTileMap.offset.x = startX;
+    newTileMap.offset.y = startY;
+    
+    //TODO(denis): maybe this should move out?
+    NewTileMapPanelData* data = newTileMapPanelGetData();
+    newTileMapPanelSetVisible(false);
+
+    newTileMap.widthInTiles = data->widthInTiles;
+    newTileMap.heightInTiles = data->heightInTiles;
+    newTileMap.tileSize = data->tileSize;
+				    
+    int memorySize = sizeof(Tile)*newTileMap.widthInTiles*newTileMap.heightInTiles;
+    
+    HANDLE heapHandle = GetProcessHeap();
+    newTileMap.tiles = (Tile*) HeapAlloc(heapHandle, HEAP_ZERO_MEMORY, memorySize);
+
+    if (newTileMap.tiles)
+    {	
+	Tile *row = newTileMap.tiles;
+	for (int i = 0; i < newTileMap.heightInTiles; ++i)
+	{
+	    Tile *element = row;
+	    for (int j = 0; j < newTileMap.widthInTiles; ++j)
+	    {
+		SDL_Rect rect;
+						
+		rect.h = newTileMap.tileSize;
+		rect.w = newTileMap.tileSize;
+		rect.x = newTileMap.offset.x + j*newTileMap.tileSize;
+		rect.y = newTileMap.offset.y + i*newTileMap.tileSize;
+		
+		element->pos = rect;
+		
+		++element;
+	    }
+	    row += newTileMap.widthInTiles;
+	}
+    }
+
+    return newTileMap;
 }
 
 int main(int argc, char* argv[])
@@ -121,9 +163,6 @@ int main(int argc, char* argv[])
 	    && IMG_Init(IMG_INIT_PNG) != 0)
 	{
 	    bool running = true;
-	    
-	    //TODO(denis): i don't like this loose variable here
-	    int tileMapPadding = 30;
 	    
 	    char *tileSetFileName = "some_tiles.png";
 	    Button currentTileSet = {};
@@ -166,13 +205,40 @@ int main(int argc, char* argv[])
 
 	    ui_setFont(defaultFontName, defaultFontSize);
 	    
-	    //TODO(denis): use the window dimenensions to decide width and height
-	    // and use the topMenuBar to position this
 	    {
-		int centreX = WINDOW_WIDTH/2;
-		int centreY = WINDOW_HEIGHT/2;
-		createNewTileMapPanel(centreX, centreY, 0, 0);
+		createNewTileMapPanel(0, 0, 0, 0);
+		int centreX = WINDOW_WIDTH/2 - newTileMapPanelGetWidth()/2;
+		int centreY = WINDOW_HEIGHT/2 - newTileMapPanelGetHeight()/2;
+		newTileMapPanelSetPosition({centreX, centreY});
+		newTileMapPanelSetVisible(false);
 	    }
+
+	    UIPanel tileSetPanel = {};
+	    {
+		int width = WINDOW_WIDTH/3;
+		int height = WINDOW_HEIGHT - 
+		    (topMenuBar.botRight.y - topMenuBar.topLeft.y) - 30;
+		int x = WINDOW_WIDTH - width - 15;
+		int y = topMenuBar.botRight.y + 15;
+		Uint32 colour = 0xFF00BB55;
+	        tileSetPanel = ui_createPanel(x, y, width, height, colour);
+	    }
+	    DropDownMenu tileSetDropDown = {};
+	    {
+		char *items[] = {"NONE"};
+		int num = 1;
+		int width = tileSetPanel.getWidth()-30;
+		int height = 40;
+		uint32 backgroundColour = 0xFFEEEEEE;
+		tileSetDropDown =
+		    ui_createDropDownMenu(items, num, width, height, COLOUR_BLACK,
+					  backgroundColour);
+
+		Vector2 newPos = {WINDOW_WIDTH - WINDOW_WIDTH/3,
+				  topMenuBar.getHeight() + 30};
+		tileSetDropDown.setPosition(newPos);
+	    }
+	    ui_addToPanel(&tileSetDropDown, &tileSetPanel);
 		
 	    const enum { PAINT_TOOL,
 		   FILL_TOOL
@@ -207,7 +273,7 @@ int main(int argc, char* argv[])
 				
 				if (tileMap.tiles)
 				{
-				    reorientEditingArea(windowWidth, windowHeight, &tileMap, tileMapPadding,
+				    reorientEditingArea(windowWidth, windowHeight, &tileMap,
 							&menuX, &menuY);
 				    
 				    Tile *row = tileMap.tiles;
@@ -226,6 +292,13 @@ int main(int argc, char* argv[])
 
 				//TODO(denis): might want to resize the new tile map
 				// panel here
+				if (newTileMapPanelVisible())
+				{
+				    Vector2 newPos = {};
+				    newPos.x = windowWidth/2 - newTileMapPanelGetWidth()/2;
+				    newPos.y = windowHeight/2 - newTileMapPanelGetHeight()/2;
+				    newTileMapPanelSetPosition(newPos);
+				}
 			    }
 			    
 			} break;
@@ -379,72 +452,6 @@ int main(int argc, char* argv[])
 			    else if (newTileMapPanelVisible())
 			    {
 				newTileMapPanelRespondToMouseUp(mouse, mouseButton);
-
-				if (newTileMapPanelDataReady())
-				{
-				    NewTileMapPanelData* data =
-					newTileMapPanelGetData();
-				    newTileMapPanelSetVisible(false);
-
-				    tileMap.widthInTiles = data->widthInTiles;
-				    tileMap.heightInTiles = data->heightInTiles;
-				    tileMap.tileSize = data->tileSize;
-				    
-				    int memorySize = sizeof(Tile)*tileMap.widthInTiles*tileMap.heightInTiles;
-				    
-				    HANDLE heapHandle = GetProcessHeap();
-				    tileMap.tiles = (Tile*) HeapAlloc(heapHandle, HEAP_ZERO_MEMORY, memorySize);
-
-				    if (tileMap.tiles)
-				    {
-					int windowHeight = 0;
-					int windowWidth = 0;
-					SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-					
-					reorientEditingArea(windowWidth, windowHeight, &tileMap, tileMapPadding,
-							    &menuX, &menuY);
-
-					int textBoxWidth = tileMap.widthInTiles*tileMap.tileSize - 20;
-					item1 = ui_createTextBox("first tile map", textBoxWidth, 35, COLOUR_BLACK,
-								 0xFFFFFFFF);
-					item2 = ui_createTextBox("second tile map", textBoxWidth, 35, COLOUR_BLACK,
-								 0xFFFFFFFF);
-					item3 = ui_createTextBox("third tile map", textBoxWidth, 35, COLOUR_BLACK,
-								 0xFFFFFFFF);
-					item1.setPosition({menuX, menuY});
-					
-					Tile *row = tileMap.tiles;
-					for (int i = 0; i < tileMap.heightInTiles; ++i)
-					{
-					    Tile *element = row;
-					    for (int j = 0; j < tileMap.widthInTiles; ++j)
-					    {
-						SDL_Rect rect;
-						
-						rect.h = tileMap.tileSize;
-						rect.w = tileMap.tileSize;
-						rect.x = tileMap.offset.x + j*tileMap.tileSize;
-						rect.y = tileMap.offset.y + i*tileMap.tileSize;
-						
-						element->pos = rect;
-
-						++element;
-					    }
-					    row += tileMap.widthInTiles;
-					}
-
-					currentTileSet.background = loadImage(renderer,
-									      tileSetFileName);
-
-					selectionBox = createFilledTexturedRect(
-					    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
-					selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
-
-					saveButton = ui_createTextButton("Save", COLOUR_WHITE,
-									 100, 50, 0xFF33AA88);
-				    }
-				    
-				}
 			    }
 			    
 			    //TODO(denis): temporary drop down menu test
@@ -567,22 +574,88 @@ int main(int argc, char* argv[])
 				    newTileMapPanelCharDeleted();
 			    }
 			} break;
+
+			case SDL_KEYUP:
+			{
+			    if (event.key.keysym.sym == SDLK_TAB)
+			    {
+				if (newTileMapPanelVisible())
+				{
+				    SDL_Keymod mod = SDL_GetModState();
+
+				    if ((mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT))
+					newTileMapPanelSelectPrevious();
+				    else
+					newTileMapPanelSelectNext();
+				}
+			    }
+			    else if (event.key.keysym.sym == SDLK_RETURN ||
+				     event.key.keysym.sym == SDLK_KP_ENTER)
+			    {
+				if (newTileMapPanelVisible())
+				    newTileMapPanelEnterPressed();
+			    }
+			    
+			} break;
 		    }
 		}
 
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
 
+		ui_draw(&tileSetPanel);
 		newTileMapPanelDraw();
 		
 		ui_draw(&saveButton);
 
+		if (newTileMapPanelVisible())
+		{
+		    if (newTileMapPanelDataReady())
+		    {
+			/*
+			  int windowHeight = 0;
+			  int windowWidth = 0;
+			  SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+
+			  reorientEditingArea(windowWidth, windowHeight, &tileMap,
+			  &menuX, &menuY);
+			*/
+			
+			tileMap = createNewTileMap(50, 100);
+			
+			//TODO(denis): this should only be done once
+			// preferably at the beginning
+			int textBoxWidth = tileMap.widthInTiles*tileMap.tileSize - 20;
+			item1 = ui_createTextBox("first tile map", textBoxWidth, 35, COLOUR_BLACK,
+						 0xFFFFFFFF);
+			item2 = ui_createTextBox("second tile map", textBoxWidth, 35, COLOUR_BLACK,
+						 0xFFFFFFFF);
+			item3 = ui_createTextBox("third tile map", textBoxWidth, 35, COLOUR_BLACK,
+						 0xFFFFFFFF);
+			item1.setPosition({menuX, menuY});
+			currentTileSet.background = loadImage(renderer,
+							      tileSetFileName);
+
+			selectionBox = createFilledTexturedRect(
+			    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
+
+			//TODO(denis): this doesn't do anything since we don't pass
+			// the mouse position
+			selectionVisible = moveSelectionBox(&selectionBox, {0,0}, &tileMap, &currentTileSet.background);
+
+			saveButton = ui_createTextButton("Save", COLOUR_WHITE,
+							 100, 50, 0xFF33AA88);
+		    }
+		}
+		
 		if (currentTileSet.background.image != NULL)
 		{
 		    int tileMapBottom = tileMap.offset.y + tileMap.heightInTiles*tileMap.tileSize;
 		    int tileMapRight = tileMap.offset.x + tileMap.widthInTiles*tileMap.tileSize;
-		    
-		    if (tileMap.offset.x == tileMapPadding)
+
+		    //TODO(denis): this should probably be mixed in with the
+		    // reorientEditingArea call
+		    if (tileMap.offset.x == 30)
 		    {
 			//NOTE(denis): draw on right side
 			//TODO(denis): draw it centered on the right side
@@ -599,7 +672,7 @@ int main(int argc, char* argv[])
 			fillToolIcon.background.pos.x = tileMapRight + 10;
 			fillToolIcon.background.pos.y = 90;
 		    }
-		    else if (tileMap.offset.y == tileMapPadding)
+		    else if (tileMap.offset.y == 30)
 		    {
                         //NOTE(denis): draw on bottom
 			//TODO(denis): draw it centered on the bottom

@@ -11,8 +11,16 @@ struct NewTileMapPanelData
 
 void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight);
 
+void newTileMapPanelSetPosition(Vector2 newPos);
+int newTileMapPanelGetWidth();
+int newTileMapPanelGetHeight();
+
 void newTileMapPanelRespondToMouseDown(Vector2 mousePos, uint8 mouseButton);
 void newTileMapPanelRespondToMouseUp(Vector2 mousePos, uint8 mouseButton);
+
+void newTileMapPanelSelectNext();
+void newTileMapPanelSelectPrevious();
+void newTileMapPanelEnterPressed();
 
 void newTileMapPanelCharInput(char c);
 void newTileMapPanelCharDeleted();

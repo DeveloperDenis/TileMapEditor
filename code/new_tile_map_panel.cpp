@@ -1,13 +1,15 @@
 #include "ui_elements.h"
+#include "denis_adt.h"
 #include "new_tile_map_panel.h"
 #include "TEMP_GeneralFunctions.cpp"
 
 #define PANEL_PADDING 15 //in pixels
-#define PANEL_COLOUR 0xFFFF99CC
+#define PANEL_COLOUR 0xFFAAAAAA
 #define PANEL_MIN_WIDTH 400
 #define PANEL_MIN_HEIGHT 300
 
 #define TEXT_COLOUR COLOUR_WHITE
+#define BUTTON_COLOUR 0xFF333333
 
 static UIPanel _panel;
 
@@ -82,9 +84,6 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
     _panel = ui_createPanel(startX, startY, width, height, PANEL_COLOUR);
 
     //TODO(denis): use the maxWidth and maxHeight to decide the sizes for things
-    int rowX = startX+PANEL_PADDING;
-    int rowY = startY+PANEL_PADDING;
-
     int tileNameWidth = 200;
     int editTextWidth = 50;
     int createButtonWidth = 100;
@@ -101,10 +100,6 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
 	ui_createEditText(0, 0, tileNameWidth, _tileMapNameText.pos.h,
 			  COLOUR_WHITE, 2);
     ui_addToPanel(&_tileMapNameEditText, &_panel);
-
-    UIElement row1[] = {ui_packIntoUIElement(&_tileMapNameText),
-			  ui_packIntoUIElement(&_tileMapNameEditText)};
-    setRowPositions(rowX, rowY, width, height, row1, 2);
     
     //NOTE(denis): second row
     _tileSizeText =
@@ -115,11 +110,6 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
 	ui_createEditText(0, 0, editTextWidth, _tileSizeText.pos.h, COLOUR_WHITE, 2);
     _tileSizeEditText.allowedCharacters = _numberChars;
     ui_addToPanel(&_tileSizeEditText, &_panel);
-
-    rowY += _tileMapNameText.pos.h + PANEL_PADDING;
-    UIElement row2[] = {ui_packIntoUIElement(&_tileSizeText),
-			ui_packIntoUIElement(&_tileSizeEditText)};
-    setRowPositions(rowX, rowY, width, height, row2, 2);
 
     //NOTE(denis): third row
     _widthText =
@@ -143,14 +133,6 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
     _tilesText =
 	ui_createTextField("tiles", 0, 0, TEXT_COLOUR);
     ui_addToPanel(&_tilesText, &_panel);
-
-    rowY += _tileSizeText.pos.h + PANEL_PADDING;
-    UIElement row3[] = {ui_packIntoUIElement(&_widthText),
-			ui_packIntoUIElement(&_widthPxEditText),
-			ui_packIntoUIElement(&_pixelsText),
-			ui_packIntoUIElement(&_widthTilesEditText),
-			ui_packIntoUIElement(&_tilesText)};
-    setRowPositions(rowX, rowY, width, height, row3, 5);
     
     //NOTE(denis): fourth row
     _heightText =
@@ -174,7 +156,46 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
     _tilesText2 =
 	ui_createTextField("tiles", 0, 0, TEXT_COLOUR);
     ui_addToPanel(&_tilesText2, &_panel);	    
+    
+    //NOTE(denis): fifth row
+    _createButton  = ui_createTextButton("Create New Map", COLOUR_WHITE,
+			    createButtonWidth, createButtonHeight, BUTTON_COLOUR);
+    ui_addToPanel(&_createButton, &_panel);
 
+    newTileMapPanelSetPosition({startX, startY});
+}
+
+void newTileMapPanelSetPosition(Vector2 newPos)
+{
+    _panel.panel.pos.x = newPos.x;
+    _panel.panel.pos.y = newPos.y;
+    
+    int rowX = newPos.x + PANEL_PADDING;
+    int rowY = newPos.y + PANEL_PADDING;
+    int width = _panel.panel.pos.w;
+    int height = _panel.panel.pos.h;
+    
+    //NOTE(denis): row 1
+    UIElement row1[] = {ui_packIntoUIElement(&_tileMapNameText),
+			ui_packIntoUIElement(&_tileMapNameEditText)};
+    setRowPositions(rowX, rowY, width, height, row1, 2);
+
+    //NOTE(denis): row 2
+    rowY += _tileMapNameText.pos.h + PANEL_PADDING;
+    UIElement row2[] = {ui_packIntoUIElement(&_tileSizeText),
+			ui_packIntoUIElement(&_tileSizeEditText)};
+    setRowPositions(rowX, rowY, width, height, row2, 2);
+
+    //NOTE(denis): row 3
+    rowY += _tileSizeText.pos.h + PANEL_PADDING;
+    UIElement row3[] = {ui_packIntoUIElement(&_widthText),
+			ui_packIntoUIElement(&_widthPxEditText),
+			ui_packIntoUIElement(&_pixelsText),
+			ui_packIntoUIElement(&_widthTilesEditText),
+			ui_packIntoUIElement(&_tilesText)};
+    setRowPositions(rowX, rowY, width, height, row3, 5);
+
+    //NOTE(denis): row 4
     rowY += _widthText.pos.h + PANEL_PADDING;
     UIElement row4[] = {ui_packIntoUIElement(&_heightText),
 			ui_packIntoUIElement(&_heightPxEditText),
@@ -182,15 +203,21 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
 			ui_packIntoUIElement(&_heightTilesEditText),
 			ui_packIntoUIElement(&_tilesText2)};
     setRowPositions(rowX, rowY, width, height, row4, 5);
-    
-    //NOTE(denis): fifth row
-    _createButton  = ui_createTextButton("Create New Map", COLOUR_WHITE,
-			    createButtonWidth, createButtonHeight, 0xFFFF0000);
+
+    //NOTE(denis0: row 5
     rowY += _heightText.pos.h;
-    int centreY = rowY + (height-(rowY-startY))/2 - _createButton.background.pos.h/2;
-    int centreX = startX + width/2 - _createButton.getWidth()/2;
+    int centreY = rowY + (height-(rowY-newPos.y))/2 - _createButton.background.pos.h/2;
+    int centreX = newPos.x + width/2 - _createButton.getWidth()/2;
     _createButton.setPosition({centreX, centreY});
-    ui_addToPanel(&_createButton, &_panel);
+}
+
+int newTileMapPanelGetWidth()
+{
+    return _panel.panel.pos.w;
+}
+int newTileMapPanelGetHeight()
+{
+    return _panel.panel.pos.h;
 }
 
 void newTileMapPanelRespondToMouseDown(Vector2 mousePos, uint8 mouseButton)
@@ -203,6 +230,107 @@ void newTileMapPanelRespondToMouseUp(Vector2 mousePos, uint8 mouseButton)
     ui_processMouseUp(&_panel, mousePos, mouseButton);
 
     _newTileMapClicked = ui_wasClicked(_createButton, mousePos);
+}
+
+void newTileMapPanelSelectNext()
+{
+    if (_panel.panelElements)
+    {
+	Node *current = _panel.panelElements->front;
+	
+	Node *currentSelection = NULL;
+	Node *nextSelection = NULL;
+	
+	while (current != NULL && !nextSelection)
+	{
+	    if (current->data.type == UI_EDITTEXT)
+	    {
+		if (current->data.editText->selected)
+		{
+		    currentSelection = current;
+		}
+		if (currentSelection && !current->data.editText->selected)
+		{
+		    nextSelection = current;
+		}
+	    }
+
+	    current = current->next;
+	}
+
+	//TODO(denis): waste of computing if there is only one EditText
+	if (currentSelection && !nextSelection)
+	{
+	    current = _panel.panelElements->front;
+	    while (current != NULL && !nextSelection)
+	    {
+		if (current->data.type == UI_EDITTEXT &&
+		    !current->data.editText->selected)
+		{
+		    nextSelection = current;
+		}
+
+		current = current->next;
+	    }
+	}
+
+	if (nextSelection)
+	{
+	    currentSelection->data.editText->selected = false;
+	    nextSelection->data.editText->selected = true;
+	}
+    }
+}
+
+void newTileMapPanelSelectPrevious()
+{
+    if (_panel.panelElements)
+    {
+	Node *current = _panel.panelElements->front;
+
+	Node *currentSelection = NULL;
+	Node *previousSelection = NULL;
+
+	bool previousFound = false;
+
+	while (current != NULL && !previousFound)
+	{
+	    if (current->data.type == UI_EDITTEXT)
+	    {
+		if (current->data.editText->selected)
+		{
+		    currentSelection = current;
+
+		    if (previousSelection)
+			previousFound = true;
+		}
+		else if (!currentSelection)
+		{
+		    previousSelection = current;
+		}
+
+		if (currentSelection && !previousFound)
+		    previousSelection = current;
+	    }
+
+	    current = current->next;
+	}
+
+	if (previousSelection && currentSelection)
+	{
+	    currentSelection->data.editText->selected = false;
+	    previousSelection->data.editText->selected = true;
+	}
+    }
+}
+
+void newTileMapPanelEnterPressed()
+{
+    _newTileMapClicked = true;
+
+    //TODO(denis): dunno if this is needed
+    if (!newTileMapPanelDataReady())
+	_newTileMapClicked = false;
 }
 
 void newTileMapPanelCharInput(char c)
@@ -287,6 +415,9 @@ bool newTileMapPanelVisible()
 void newTileMapPanelSetVisible(bool newValue)
 {
     _panel.visible = newValue;
+
+    if (newValue = false)
+	_newTileMapClicked = false;
 }
 
 bool newTileMapPanelDataReady()

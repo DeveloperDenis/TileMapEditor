@@ -131,8 +131,7 @@ SDL_Rect DropDownMenu::getRect()
 
 void DropDownMenu::setPosition(Vector2 newPos)
 {
-    this->items[0].pos.x = newPos.x;
-    this->items[0].pos.y = newPos.y;
+    this->items[0].setPosition(newPos);
 }
 
 void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
@@ -496,9 +495,10 @@ static void addToPanel(UIElement data, UIPanel *panel)
 	panel->panelElements->front = 0;
     }
 	
-    adt_addTo(panel->panelElements, data);
+    adt_addToBack(panel->panelElements, data);
 }
 
+//TODO(denis): use the ui_packIntoUIElement functions
 UIPanel ui_addToPanel(EditText *editText)
 {
     UIPanel newPanel = {};
@@ -563,6 +563,23 @@ void ui_addToPanel(TextBox *textBox, UIPanel *panel)
 
     addToPanel(data, panel);
 }
+
+UIPanel ui_addToPanel(DropDownMenu *dropDownMenu)
+{
+    UIPanel newPanel = {};
+    ui_addToPanel(dropDownMenu, &newPanel);
+
+    return newPanel;
+}
+void ui_addToPanel(DropDownMenu *dropDownMenu, UIPanel *panel)
+{
+    UIElement data = {};
+    data.type = UI_DROPDOWNMENU;
+    data.dropDownMenu = dropDownMenu;
+
+    addToPanel(data, panel);
+}
+
 
 void ui_delete(UIPanel *panel)
 {

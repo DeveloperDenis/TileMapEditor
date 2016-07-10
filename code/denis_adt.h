@@ -15,6 +15,7 @@ struct LinkedList
     Node *front;
 };
 
-void adt_addTo(LinkedList *ll, NodeDataType data);
+void adt_addToFront(LinkedList *ll, NodeDataType data);
+void adt_addToBack(LinkedList *ll, NodeDataType data);
 
 #endif

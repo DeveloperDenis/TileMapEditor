@@ -92,6 +92,8 @@ struct MenuBar
     void onMouseMove(Vector2 mousePos);
     void onMouseDown(Vector2 mousePos, Uint8 button);
     bool onMouseUp(Vector2 mousePos, Uint8 button);
+
+    int getHeight() { return this->menus[0].getRect().h; };
 };
 
 enum UIElementType
@@ -126,6 +128,8 @@ struct UIPanel
     LinkedList *panelElements;
     bool visible;
     TexturedRect panel;
+
+    int getWidth() { return this->panel.pos.w; };
 };
 
 bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize);
@@ -175,6 +179,8 @@ UIPanel ui_addToPanel(Button *button);
 void ui_addToPanel(Button *button, UIPanel *panel);
 UIPanel ui_addToPanel(TextBox *textBox);
 void ui_addToPanel(TextBox *textBox, UIPanel *panel);
+UIPanel ui_addToPanel(DropDownMenu *dropDownMenu);
+void ui_addToPanel(DropDownMenu *dropDownMenu, UIPanel *panel);
 
 //TODO(denis): templates?
 UIElement ui_packIntoUIElement(EditText *editText);
