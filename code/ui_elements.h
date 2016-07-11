@@ -68,6 +68,10 @@ struct DropDownMenu
     SDL_Texture *selectionBox;
     
     bool isOpen;
+    //NOTE(denis): isMenu == true means that when the drop down menu is open, the
+    // top-most item will always be selected, otherwise only the item over the mouse
+    // should be selected
+    bool isMenu;
     bool startedClick;
     
     SDL_Rect getRect();

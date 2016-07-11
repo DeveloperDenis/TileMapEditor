@@ -13,6 +13,11 @@
  * (again in different formats)
  *
  * limit the FPS
+ *
+ * CTRL + N -> create new tile map
+ * CTRL + O -> open tile map
+ * CTRL + S -> save current tile map
+ * etc...
  */
 
 #include <SDL.h>
@@ -164,7 +169,6 @@ int main(int argc, char* argv[])
 	{
 	    bool running = true;
 	    
-	    char *tileSetFileName = "some_tiles.png";
 	    Button currentTileSet = {};
 	    Button saveButton = {};
 	    
@@ -225,8 +229,9 @@ int main(int argc, char* argv[])
 	    }
 	    DropDownMenu tileSetDropDown = {};
 	    {
-		char *items[] = {"NONE"};
-		int num = 1;
+		char *items[] = {"No Tile Sheet Selected",
+				 "Import a new tile sheet .."};
+		int num = 2;
 		int width = tileSetPanel.getWidth()-30;
 		int height = 40;
 		uint32 backgroundColour = 0xFFEEEEEE;
@@ -309,8 +314,19 @@ int main(int argc, char* argv[])
 			    // window but has moved off of it
 
 			    Vector2 mouse = {event.motion.x, event.motion.y};
-
+			    
 			    topMenuBar.onMouseMove(mouse);
+
+
+			    if (tileSetPanel.visible && tileSetDropDown.isOpen)
+			    {
+				if (pointInRect(mouse, tileSetDropDown.getRect()))
+				{
+				    int highlighted =
+					(mouse.y - tileSetDropDown.getRect().y) / tileSetDropDown.items[0].pos.h;
+				    tileSetDropDown.highlightedItem = highlighted;
+				}
+			    }
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
@@ -387,9 +403,15 @@ int main(int argc, char* argv[])
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
 			    
-			    newTileMapPanelRespondToMouseDown(mouse, mouseButton); 
+			    newTileMapPanelRespondToMouseDown(mouse, mouseButton);
+
+			    //TODO(denis): testing tile set panel
+			    tileSetDropDown.startedClick =
+				pointInRect(mouse, tileSetDropDown.getRect());
 			    
 			    //TODO(denis): replace this with the ui call
+			    //TODO(denis): only do this if the top bar isn't clicked,
+			    // etc..
 			    fillToolIcon.startedClick = pointInRect(mouse, fillToolIcon.background.pos);
 			    paintToolIcon.startedClick = pointInRect(mouse, paintToolIcon.background.pos);
 			    currentTileSet.startedClick = pointInRect(mouse, currentTileSet.background.pos);
@@ -452,6 +474,32 @@ int main(int argc, char* argv[])
 			    else if (newTileMapPanelVisible())
 			    {
 				newTileMapPanelRespondToMouseUp(mouse, mouseButton);
+			    }
+
+			    if (tileSetPanel.visible)
+			    {
+				if (tileSetDropDown.isOpen)
+				{
+				    if (currentTileSet.background.image == NULL
+					&& pointInRect(mouse, tileSetDropDown.getRect()))
+				    {
+					int selection = (mouse.y - tileSetDropDown.getRect().y)/tileSetDropDown.items[0].pos.h;
+					if (selection == 1)
+					{
+					    loadTileSheet();
+					}
+				    }
+
+				    tileSetDropDown.highlightedItem = -1;
+				    tileSetDropDown.isOpen = false;
+				}
+				else if (pointInRect(mouse, tileSetDropDown.getRect())
+					 && tileSetDropDown.startedClick)
+				{
+				    tileSetDropDown.isOpen = true;
+				    tileSetDropDown.highlightedItem = 0;
+				}
+				    
 			    }
 			    
 			    //TODO(denis): temporary drop down menu test
@@ -633,8 +681,6 @@ int main(int argc, char* argv[])
 			item3 = ui_createTextBox("third tile map", textBoxWidth, 35, COLOUR_BLACK,
 						 0xFFFFFFFF);
 			item1.setPosition({menuX, menuY});
-			currentTileSet.background = loadImage(renderer,
-							      tileSetFileName);
 
 			selectionBox = createFilledTexturedRect(
 			    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);

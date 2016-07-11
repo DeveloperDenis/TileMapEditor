@@ -108,9 +108,11 @@ void TextBox::setPosition(Vector2 newPos)
     this->pos.x = newPos.x;
     this->pos.y = newPos.y;
 
-    //TODO(denis): doesn't take into account any text padding
-    this->text.pos.x = newPos.x;
-    this->text.pos.y = newPos.y;
+    //TODO(denis): for now, always centres text
+    int textX = this->pos.x + this->pos.w/2 - this->text.pos.w/2;
+    int textY = this->pos.y + this->pos.h/2 - this->text.pos.h/2;
+    this->text.pos.x = textX;
+    this->text.pos.y = textY;
 }
 
 SDL_Rect DropDownMenu::getRect()
@@ -147,6 +149,7 @@ void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
 	x += this->menuCount*this->menus[this->menuCount-1].items[0].pos.w;
     
     this->menus[this->menuCount].items[0].setPosition({x, 0});
+    this->menus[this->menuCount].isMenu = true;
     
     ++this->menuCount;
 }
@@ -167,7 +170,7 @@ void MenuBar::onMouseMove(Vector2 mousePos)
 }
 
 void MenuBar::onMouseDown(Vector2 mousePos, Uint8 button)
-{   
+{
     for (int i = 0; i < this->menuCount; ++i)
     {
 	if (button == SDL_BUTTON_LEFT)
@@ -931,16 +934,24 @@ void ui_draw(DropDownMenu *dropDownMenu)
 	if (dropDownMenu->isOpen)
 	{
 	    dropDownMenu->items[0].background = dropDownMenu->selectionBox;
+
+	    int startValue = 0;
+	    if (dropDownMenu->isMenu)
+	    {
+		ui_draw(&dropDownMenu->items[0]);
+		startValue = 1;
+	    }
+			
 	    
-	    for (int i = 0; i < dropDownMenu->itemCount; ++i)
+	    for (int i = startValue; i < dropDownMenu->itemCount; ++i)
 	    {
 		if (dropDownMenu->items[i].background != NULL)
 		{
-		    if (i == dropDownMenu->highlightedItem && i!=0)
+		    if (i == dropDownMenu->highlightedItem)
 		    {
 			dropDownMenu->items[i].background = dropDownMenu->selectionBox;
 		    }
-		    else if (i != 0)
+		    else
 			dropDownMenu->items[i].background = dropDownMenu->unselectedTexture;
 		    
 		    dropDownMenu->items[i].setPosition({x, y + i*itemHeight});

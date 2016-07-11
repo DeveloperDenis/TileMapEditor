@@ -33,8 +33,6 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
     
     OPENFILENAME openFileName = {};
     openFileName.lStructSize = sizeof(OPENFILENAME);
-//TODO(denis): if required can use SDL_GetWindowWMInfo()
-//openFileName.hwndOwner = ;
     char *filter = "JavaScript File\0*.js\0Text File\0*.txt\0\0";
     openFileName.lpstrFilter = filter;
     openFileName.lpstrFile = fileName;
@@ -99,5 +97,30 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 		fclose(outputFile);
 	    }
 	}
+    }
+}
+
+void loadTileSheet()
+{
+    OPENFILENAME openFileName = {};
+
+    char fileNameBuffer[256] = {};
+    
+    openFileName.lStructSize = sizeof(OPENFILENAME);
+    char *filter = "Tile Sheet file\0*.png\0\0";
+    openFileName.lpstrFilter = filter;
+    openFileName.lpstrFile = fileNameBuffer;
+    openFileName.nMaxFile = 256;
+    //TODO(denis): dunno if I want this in the save function
+    //openFileName.lpstrFileTitle = ;
+    openFileName.Flags = OFN_FILEMUSTEXIST;
+    openFileName.lpstrDefExt = "png";
+    
+    BOOL result = GetOpenFileName(&openFileName);
+
+    if (result != 0)
+    {
+	//TODO(denis): do the tile sheet processing
+	OutputDebugStringA("you are trying to click the import button\n");
     }
 }
