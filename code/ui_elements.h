@@ -15,6 +15,7 @@ struct Button
     TexturedRect foreground;
 
     int getWidth() { return background.pos.w; };
+    int getHeight() { return background.pos.h; };
     void setPosition(Vector2 newPos);
     void destroy();
 };
@@ -142,8 +143,8 @@ void ui_destroy();
 //NOTE(denis): returns false if the font was not found
 bool ui_setFont(char *fontName, int fontSize);
 
-bool ui_processMouseDown(UIPanel *group, Vector2 mousePos, Uint8 button);
-bool ui_processMouseUp(UIPanel *group, Vector2 mousePos, Uint8 button);
+bool ui_processMouseDown(UIPanel *panel, Vector2 mousePos, Uint8 button);
+bool ui_processMouseUp(UIPanel *panel, Vector2 mousePos, Uint8 button);
 //TODO(denis): might want something like this
 //void ui_processMouseMotion(Vector2 mousePos);
 
@@ -210,5 +211,6 @@ void ui_draw(MenuBar *menuBar);
 
 const SDL_Color COLOUR_WHITE = {255,255,255,255};
 const SDL_Color COLOUR_BLACK = {0,0,0,255};
+const SDL_Color COLOUR_RED = {255, 0, 0, 255};
 
 #endif

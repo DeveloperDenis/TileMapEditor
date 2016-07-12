@@ -20,6 +20,9 @@
  * etc...
  */
 
+//IMPORTANT(denis): note to self, design everything expecting at least a 1280 x 720
+// window
+
 #include <SDL.h>
 #include "SDL_ttf.h"
 #include "SDL_image.h"
@@ -188,8 +191,9 @@ int main(int argc, char* argv[])
 	    MenuBar topMenuBar = ui_createMenuBar(0, 0, WINDOW_WIDTH, 20,
 						  0xFFCCCCCC, 0xFF000000);
 	    
-	    char *items[] = {"File", "Open Tile Map...", "Save Tile Map...", "Exit"};	     
-	    topMenuBar.addMenu(items, 4, 225);
+	    char *items[] = {"File", "Open Tile Map...", "Save Tile Map...",
+			     "Import Tile Sheet...", "Exit"};	     
+	    topMenuBar.addMenu(items, 5, 225);
 	    items[0] = "Tile Maps";
 	    items[1] = "Create New";
 	    items[2] = "NOT FINAL";
@@ -217,6 +221,69 @@ int main(int argc, char* argv[])
 		newTileMapPanelSetVisible(false);
 	    }
 
+	    //NOTE(denis): this is for the pop up window that appears when you
+	    // click "import tile sheet"
+	    UIPanel importTileSetPanel = {};
+	    {
+		int width = 950;
+		int height = 150;
+		int x = WINDOW_WIDTH/2 - width/2;
+		int y = WINDOW_HEIGHT/2 - height/2;
+		uint32 colour = 0xFF222222;
+		importTileSetPanel = ui_createPanel(x, y, width, height, colour);
+		importTileSetPanel.visible = false;
+	    }
+	    TexturedRect tileSizeText =
+		ui_createTextField("Tile Size:", importTileSetPanel.panel.pos.x + 15,
+				   importTileSetPanel.panel.pos.y + 15, COLOUR_WHITE);
+	    ui_addToPanel(&tileSizeText, &importTileSetPanel);
+
+	    EditText tileSizeEditText =
+		ui_createEditText(tileSizeText.pos.x + tileSizeText.getWidth() + 15,
+				  tileSizeText.pos.y, 100, tileSizeText.getHeight(),
+				  COLOUR_WHITE, 5);
+	    char chars[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0 };
+	    tileSizeEditText.allowedCharacters = chars;
+	    ui_addToPanel(&tileSizeEditText, &importTileSetPanel);
+
+	    TexturedRect tileSheetText =
+		ui_createTextField("Tile Sheet:", tileSizeText.pos.x,
+				   tileSizeText.pos.y+tileSizeText.pos.h + 5,
+				   COLOUR_WHITE);
+	    ui_addToPanel(&tileSheetText, &importTileSetPanel);
+
+	    EditText tileSheetEditText =
+		ui_createEditText(tileSheetText.pos.x + tileSheetText.getWidth() + 15,
+				  tileSheetText.pos.y, importTileSetPanel.getWidth() - tileSheetText.getWidth() - 45,
+				  tileSheetText.getHeight(),
+				  COLOUR_WHITE, 5);
+	    ui_addToPanel(&tileSheetEditText, &importTileSetPanel);
+
+	    Button browseTileSetButton =
+		ui_createTextButton("Browse", COLOUR_WHITE, 0, 0, 0xFF000000);
+	    {
+		int x = tileSheetEditText.pos.x + tileSheetEditText.getWidth()/2 - browseTileSetButton.getWidth()/2;
+		int y = tileSheetEditText.pos.y + browseTileSetButton.getHeight() + 5;
+		browseTileSetButton.setPosition({x,y});
+	    }
+	    ui_addToPanel(&browseTileSetButton, &importTileSetPanel);
+
+	    Button cancelButton = ui_createTextButton("Cancel", COLOUR_WHITE, 0, 0, 0xFF000000);
+	    Button openButton = ui_createTextButton("Open", COLOUR_WHITE, 0, 0, 0xFF000000);
+	    {
+		int x = importTileSetPanel.panel.pos.x + 15;
+		int y = browseTileSetButton.background.pos.y + 15;
+		cancelButton.setPosition({x,y});
+		x += cancelButton.getWidth() + 15;
+		openButton.setPosition({x,y});
+	    }
+	    ui_addToPanel(&cancelButton, &importTileSetPanel);
+	    ui_addToPanel(&openButton, &importTileSetPanel);
+
+	    TexturedRect warningText = {};
+	    ui_addToPanel(&warningText, &importTileSetPanel);
+	    
+	    
 	    UIPanel tileSetPanel = {};
 	    {
 		int width = WINDOW_WIDTH/3;
@@ -267,6 +334,9 @@ int main(int argc, char* argv[])
 
 			case SDL_WINDOWEVENT:
 			{
+			    //IMPORTANT TODO(denis): can I limit resizes to always
+			    // stay above 1280 x 720 ??
+			    
 			    if (event.window.event == SDL_WINDOWEVENT_RESIZED)
 			    {
 				int windowHeight = 0;
@@ -418,6 +488,9 @@ int main(int argc, char* argv[])
 			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
 
 			    topMenuBar.onMouseDown(mouse, event.button.button);
+
+			    if (importTileSetPanel.visible)
+				ui_processMouseDown(&importTileSetPanel, mouse, mouseButton);
 			    
 			    if (menuPause > 15 &&
 				currentTool == PAINT_TOOL && tileMap.tiles)
@@ -467,7 +540,58 @@ int main(int argc, char* argv[])
 			    // clicks, if one ui element responds to a click, the
 			    // rest of the ui elements should be ignored
 
-			    if (topMenuBar.onMouseUp(mouse, event.button.button))
+			    if (importTileSetPanel.visible)
+			    {
+				ui_processMouseUp(&importTileSetPanel, mouse, mouseButton);
+
+				if (ui_wasClicked(cancelButton, mouse))
+				{
+				    importTileSetPanel.visible = false;
+				    //TODO(denis): reset import tile set panel values
+				    // maybe save the value in the tile size field?
+				}
+				else if (ui_wasClicked(openButton, mouse))
+				{
+				    int tileSize =
+					convertStringToInt(tileSizeEditText.text,
+							   tileSizeEditText.letterCount);
+
+				    char *warning = "";
+				    if (tileSize == 0)
+				    {
+					warning = "tile size must be non-zero";
+				    }
+				    else if (tileSheetEditText.letterCount == 0)
+				    {
+					warning = "no tile sheet file selected";
+				    }
+				    else
+				    {
+					//TODO(denis): load the tile sheet file
+				    }
+				    warningText = ui_createTextField(warning, cancelButton.background.pos.x,
+								     cancelButton.background.pos.y + cancelButton.getHeight() + 15, COLOUR_RED);
+				}
+				else if (ui_wasClicked(browseTileSetButton, mouse))
+				{
+				    char *fileName = getTileSheetFileName();
+
+				    if (fileName != 0)
+				    {
+					while(tileSheetEditText.letterCount > 0)
+					    ui_eraseLetter(&tileSheetEditText);
+
+					int i = 0;
+					for (i = 0; fileName[i] != 0; ++i)
+					{
+					    ui_addLetterTo(&tileSheetEditText, fileName[i]);
+					}
+				    }
+
+				    HeapFree(GetProcessHeap(), 0, fileName);
+				}
+			    }
+			    else if (topMenuBar.onMouseUp(mouse, event.button.button))
 			    {
 				//TODO(denis): top bar was clicked
 			    }
@@ -486,7 +610,7 @@ int main(int argc, char* argv[])
 					int selection = (mouse.y - tileSetDropDown.getRect().y)/tileSetDropDown.items[0].pos.h;
 					if (selection == 1)
 					{
-					    loadTileSheet();
+					    importTileSetPanel.visible = true;
 					}
 				    }
 
@@ -612,6 +736,10 @@ int main(int argc, char* argv[])
 
 			    if (newTileMapPanelVisible())
 				newTileMapPanelCharInput(theText[0]);
+			    else if(importTileSetPanel.visible)
+			    {
+				ui_processLetterTyped(theText[0], &importTileSetPanel);
+			    }
 			} break;
 
 			case SDL_KEYDOWN:
@@ -620,6 +748,10 @@ int main(int argc, char* argv[])
 			    {
 				if (newTileMapPanelVisible())
 				    newTileMapPanelCharDeleted();
+				else if (importTileSetPanel.visible)
+				{
+				    ui_eraseLetter(&importTileSetPanel);
+				}   
 			    }
 			} break;
 
@@ -793,6 +925,8 @@ int main(int argc, char* argv[])
 		}
 
 		ui_draw(&topMenuBar);
+
+		ui_draw(&importTileSetPanel);
 		
 		SDL_RenderPresent(renderer);
 	    }

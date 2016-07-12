@@ -100,27 +100,43 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
     }
 }
 
-void loadTileSheet()
+char* getTileSheetFileName()
 {
+    char *result = 0;
+    
     OPENFILENAME openFileName = {};
 
-    char fileNameBuffer[256] = {};
+    //TODO(denis): sizeof(char) should always be 1 right?
+    int fileNameSize = 512*sizeof(char);
+    char* fileNameBuffer = (char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+					 fileNameSize);
     
     openFileName.lStructSize = sizeof(OPENFILENAME);
     char *filter = "Tile Sheet file\0*.png\0\0";
     openFileName.lpstrFilter = filter;
     openFileName.lpstrFile = fileNameBuffer;
-    openFileName.nMaxFile = 256;
+    openFileName.nMaxFile = fileNameSize/sizeof(char);
     //TODO(denis): dunno if I want this in the save function
     //openFileName.lpstrFileTitle = ;
     openFileName.Flags = OFN_FILEMUSTEXIST;
     openFileName.lpstrDefExt = "png";
     
-    BOOL result = GetOpenFileName(&openFileName);
+    BOOL fileNameFound = GetOpenFileName(&openFileName);
 
-    if (result != 0)
+    if (fileNameFound != 0)
     {
+	result = fileNameBuffer;
+	/* TODO(denis): do this somwhere else
 	//TODO(denis): do the tile sheet processing
-	OutputDebugStringA("you are trying to click the import button\n");
+	HANDLE fileHandle = CreateFile(fileNameBuffer, GENERIC_READ, FILE_SHARE_READ,
+				       NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+	if (fileHandle != INVALID_HANDLE_VALUE)
+	{
+	    
+	}
+	*/
     }
+
+    return result;
 }

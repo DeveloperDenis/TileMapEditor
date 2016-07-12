@@ -46,6 +46,7 @@ struct TexturedRect
     SDL_Rect pos;
 
     int getWidth() { return this->pos.w; };
+    int getHeight() { return this->pos.h; };
     void setPosition(Vector2 newPos)
     {
 	this->pos.x = newPos.x;
