@@ -136,6 +136,18 @@ void DropDownMenu::setPosition(Vector2 newPos)
     this->items[0].setPosition(newPos);
 }
 
+void DropDownMenu::changeItem(char *newText, int position)
+{
+    if (position < this->itemCount)
+    {
+	int x = this->items[position].text.pos.x;
+	int y = this->items[position].text.pos.y;
+	
+	this->items[position].text =
+	    ui_createTextField(newText, x, y, COLOUR_BLACK);
+    }
+}
+
 void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
 {
     int height = this->botRight.y - this->topLeft.y;

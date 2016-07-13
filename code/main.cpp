@@ -41,6 +41,14 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 
+struct TileSet
+{
+    char *name;
+    SDL_Rect pos;
+    SDL_Texture *image;
+    uint32 tileSize;
+};
+
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
 {
     Vector2 result = {};
@@ -155,7 +163,8 @@ int main(int argc, char* argv[])
     SDL_Window *window = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED,
 					  SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
 					  WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
-
+    SDL_SetWindowMinimumSize(window, WINDOW_WIDTH, WINDOW_HEIGHT);
+    
     char *defaultFontName= "LiberationMono-Regular.ttf";
     int defaultFontSize = 16;
 
@@ -172,7 +181,6 @@ int main(int argc, char* argv[])
 	{
 	    bool running = true;
 	    
-	    Button currentTileSet = {};
 	    Button saveButton = {};
 	    
 	    char *tileMapName = NULL;
@@ -282,6 +290,9 @@ int main(int argc, char* argv[])
 
 	    TexturedRect warningText = {};
 	    ui_addToPanel(&warningText, &importTileSetPanel);
+
+
+	    TileSet currentTileSet = {};
 	    
 	    
 	    UIPanel tileSetPanel = {};
@@ -334,9 +345,6 @@ int main(int argc, char* argv[])
 
 			case SDL_WINDOWEVENT:
 			{
-			    //IMPORTANT TODO(denis): can I limit resizes to always
-			    // stay above 1280 x 720 ??
-			    
 			    if (event.window.event == SDL_WINDOWEVENT_RESIZED)
 			    {
 				int windowHeight = 0;
@@ -400,8 +408,9 @@ int main(int argc, char* argv[])
 			    
 			    if (currentTool == PAINT_TOOL && tileMap.tiles)
 			    {
+#if 0
 				selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
-
+#endif
 				if (event.motion.state & SDL_BUTTON_LMASK)
 				{
 				    if (pointInRect(mouse, tileMap.getRect()))
@@ -463,7 +472,9 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
+#if 0
 				    selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
+#endif
 				}
 			    }
 			} break;
@@ -484,7 +495,9 @@ int main(int argc, char* argv[])
 			    // etc..
 			    fillToolIcon.startedClick = pointInRect(mouse, fillToolIcon.background.pos);
 			    paintToolIcon.startedClick = pointInRect(mouse, paintToolIcon.background.pos);
+#if 0
 			    currentTileSet.startedClick = pointInRect(mouse, currentTileSet.background.pos);
+#endif
 			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
 
 			    topMenuBar.onMouseDown(mouse, event.button.button);
@@ -567,7 +580,48 @@ int main(int argc, char* argv[])
 				    }
 				    else
 				    {
-					//TODO(denis): load the tile sheet file
+					TexturedRect newTileSheet = loadImage(renderer, tileSheetEditText.text);
+
+					if (newTileSheet.image != 0)
+					{
+					    char *fileName = tileSheetEditText.text;
+					    int startOfFileName = 0;
+					    int endOfFileName = 0;
+					    for (int i = 0; fileName[i] != 0; ++i)
+					    {
+						if (fileName[i] == '\\' || fileName[i] == '/')
+						    startOfFileName = i+1;
+
+						if (fileName[i+1] == 0)
+						    endOfFileName = i+1;
+					    }
+
+					    char* fileNameTruncated =
+						(char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (endOfFileName-startOfFileName+1)*sizeof(char));
+					    for (int i = 0; i < endOfFileName-startOfFileName; ++i)
+					    {
+						fileNameTruncated[i] = fileName[i+startOfFileName];
+					    }
+					    fileNameTruncated[endOfFileName-startOfFileName] = 0;
+
+					    //TODO(denis): currentTileSet.name has to be freed if ever
+					    // the tileset is deleted
+					    currentTileSet.name = fileNameTruncated;
+					    currentTileSet.pos = newTileSheet.pos;
+					    currentTileSet.image = newTileSheet.image;
+					    currentTileSet.tileSize = tileSize;
+
+					    //TODO(denis): don't do this when I have multiple tile sets
+					    // don't have the ".png" part?
+					    tileSetDropDown.changeItem(fileNameTruncated, 0);
+					    tileSetDropDown.setPosition({tileSetDropDown.getRect().x, tileSetDropDown.getRect().y});
+					    
+					    importTileSetPanel.visible = false;
+					}
+					else
+					{
+					    warning = "Error opening file";
+					}
 				    }
 				    warningText = ui_createTextField(warning, cancelButton.background.pos.x,
 								     cancelButton.background.pos.y + cancelButton.getHeight() + 15, COLOUR_RED);
@@ -604,8 +658,7 @@ int main(int argc, char* argv[])
 			    {
 				if (tileSetDropDown.isOpen)
 				{
-				    if (currentTileSet.background.image == NULL
-					&& pointInRect(mouse, tileSetDropDown.getRect()))
+				    if (pointInRect(mouse, tileSetDropDown.getRect()))
 				    {
 					int selection = (mouse.y - tileSetDropDown.getRect().y)/tileSetDropDown.items[0].pos.h;
 					if (selection == 1)
@@ -646,7 +699,8 @@ int main(int argc, char* argv[])
 				    }
 				}
 			    }
-			    
+
+#if 0
 			    if (tileMap.tiles && ui_wasClicked(currentTileSet, mouse))
 			    {
 				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.background.pos.x)/tileMap.tileSize * tileMap.tileSize;
@@ -658,7 +712,7 @@ int main(int argc, char* argv[])
 
 				currentTileSet.startedClick = false;
 			    }
-
+#endif
 			    //NOTE(denis): hit the save button
 			    if (tileMap.tiles && saveButton.startedClick)
 			    {
@@ -720,9 +774,10 @@ int main(int argc, char* argv[])
 					    }
 					}
 				    }
-
+#if 0
 				    selectionVisible = moveSelectionBox(&selectionBox, mouse,
 									&tileMap, &currentTileSet.background);
+#endif
 				    selectionBox.pos.w = tileMap.tileSize;
 				    selectionBox.pos.h = tileMap.tileSize;
 				    
@@ -783,7 +838,6 @@ int main(int argc, char* argv[])
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
 
-		ui_draw(&tileSetPanel);
 		newTileMapPanelDraw();
 		
 		ui_draw(&saveButton);
@@ -817,57 +871,57 @@ int main(int argc, char* argv[])
 			selectionBox = createFilledTexturedRect(
 			    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
 
-			//TODO(denis): this doesn't do anything since we don't pass
-			// the mouse position
-			selectionVisible = moveSelectionBox(&selectionBox, {0,0}, &tileMap, &currentTileSet.background);
-
 			saveButton = ui_createTextButton("Save", COLOUR_WHITE,
 							 100, 50, 0xFF33AA88);
 		    }
 		}
 		
-		if (currentTileSet.background.image != NULL)
+		if (tileSetPanel.visible)
 		{
-		    int tileMapBottom = tileMap.offset.y + tileMap.heightInTiles*tileMap.tileSize;
-		    int tileMapRight = tileMap.offset.x + tileMap.widthInTiles*tileMap.tileSize;
-
-		    //TODO(denis): this should probably be mixed in with the
-		    // reorientEditingArea call
-		    if (tileMap.offset.x == 30)
+		    ui_draw(&tileSetPanel);
+		    
+		    if (currentTileSet.image != 0)
 		    {
-			//NOTE(denis): draw on right side
-			//TODO(denis): draw it centered on the right side
-			currentTileSet.background.pos.x = tileMapRight + 50;
-			currentTileSet.background.pos.y = 50;
+			int tilesPerRow = (tileSetPanel.getWidth() - 30)/currentTileSet.tileSize;
 
-			Vector2 temp = {currentTileSet.background.pos.x + 20,
-					currentTileSet.background.pos.y + 100};
-			saveButton.setPosition(temp);
+			int tilesPadding = (tileSetPanel.getWidth() - tilesPerRow*currentTileSet.tileSize)/2;
+			int tileSetStartX = tileSetPanel.panel.pos.x + tilesPadding;
+			int tileSetStartY = tileSetDropDown.items[0].pos.y + tileSetDropDown.items[0].pos.h + 15;
 
-			paintToolIcon.background.pos.x = tileMapRight + 10;
-			paintToolIcon.background.pos.y = 50;
+			//TODO(denis): bundle these up into a Tile struct
+			SDL_Rect currentTileInSheet =
+			    {0, 0, currentTileSet.tileSize, currentTileSet.tileSize};
+			SDL_Rect currentTileOnScreen =
+			    {tileSetStartX, tileSetStartY,
+			     currentTileSet.tileSize, currentTileSet.tileSize};
 
-			fillToolIcon.background.pos.x = tileMapRight + 10;
-			fillToolIcon.background.pos.y = 90;
+			int numTilesY = currentTileSet.pos.h/currentTileSet.tileSize;
+			int numTilesX = currentTileSet.pos.w/currentTileSet.tileSize;
+			    
+			for (int i = 0; i < numTilesY; ++i)
+			{
+			    for (int j = 0; j < numTilesX; ++j)
+			    {
+				//TODO(denis): don't change the position of the next
+				// drawn tile if the tile sheet position is blank
+			    
+				currentTileInSheet.x = j * currentTileSet.tileSize;
+				currentTileInSheet.y = i * currentTileSet.tileSize;
+
+				currentTileOnScreen.x = tileSetStartX + ((i*numTilesX + j) % tilesPerRow)*currentTileSet.tileSize;
+			        currentTileOnScreen.y = tileSetStartY + ((i*numTilesX + j)/tilesPerRow)*currentTileSet.tileSize;
+				
+				SDL_RenderCopy(renderer, currentTileSet.image, &currentTileInSheet, &currentTileOnScreen);
+			    }
+			}
 		    }
-		    else if (tileMap.offset.y == 30)
-		    {
-                        //NOTE(denis): draw on bottom
-			//TODO(denis): draw it centered on the bottom
-			currentTileSet.background.pos.x = 50;
-			currentTileSet.background.pos.y = tileMapBottom + 50;
-			
-			paintToolIcon.background.pos.x = 50;
-			paintToolIcon.background.pos.y = tileMapBottom + 10;
 
-			fillToolIcon.background.pos.x = 90;
-			fillToolIcon.background.pos.y = tileMapBottom + 10;
-		    }
-
-		    SDL_RenderCopy(renderer, currentTileSet.background.image, NULL, &currentTileSet.background.pos);
-		    SDL_RenderCopy(renderer, paintToolIcon.background.image, NULL, &paintToolIcon.background.pos);
-		    SDL_RenderCopy(renderer, fillToolIcon.background.image, NULL, &fillToolIcon.background.pos);
+		    //TODO(denis): bad fix for the drawing order problem
+		    ui_draw(&tileSetDropDown);
 		}
+
+		SDL_RenderCopy(renderer, paintToolIcon.background.image, NULL, &paintToolIcon.background.pos);
+		SDL_RenderCopy(renderer, fillToolIcon.background.image, NULL, &fillToolIcon.background.pos);
 		
 		if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
 		{   
@@ -882,9 +936,10 @@ int main(int argc, char* argv[])
 			    {
 				SDL_RenderCopy(renderer, defaultTile.image, NULL, &element->pos);
 			    }
+#if 0
 			    else
 				SDL_RenderCopy(renderer, currentTileSet.background.image, &element->sheetPos, &element->pos);
-
+#endif
 			    ++element;
 			}
 

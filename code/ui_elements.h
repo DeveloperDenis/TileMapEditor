@@ -78,6 +78,8 @@ struct DropDownMenu
     SDL_Rect getRect();
     void setPosition(Vector2 newPos);
     int getWidth() { return this->getRect().w; };
+
+    void changeItem(char *newText, int position);
 };
 
 struct MenuBar

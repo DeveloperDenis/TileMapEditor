@@ -3,8 +3,6 @@
 #include "stdio.h"
 #include "windows.h"
 
-//TODO(denis): eventually want to let the user choose where to save the file and the
-// name
 //TODO(denis): also want to be able to save in different formats
 void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 {
@@ -126,16 +124,6 @@ char* getTileSheetFileName()
     if (fileNameFound != 0)
     {
 	result = fileNameBuffer;
-	/* TODO(denis): do this somwhere else
-	//TODO(denis): do the tile sheet processing
-	HANDLE fileHandle = CreateFile(fileNameBuffer, GENERIC_READ, FILE_SHARE_READ,
-				       NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-
-	if (fileHandle != INVALID_HANDLE_VALUE)
-	{
-	    
-	}
-	*/
     }
 
     return result;
