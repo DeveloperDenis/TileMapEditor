@@ -78,8 +78,8 @@ static void fillBWithAConverted(float conversionFactor, EditText *A, EditText *B
 
 void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
 {
-    int width = max(PANEL_MIN_WIDTH, maxWidth);
-    int height = max(PANEL_MIN_HEIGHT, maxHeight);
+    int width = MAX(PANEL_MIN_WIDTH, maxWidth);
+    int height = MAX(PANEL_MIN_HEIGHT, maxHeight);
     
     _panel = ui_createPanel(startX, startY, width, height, PANEL_COLOUR);
 

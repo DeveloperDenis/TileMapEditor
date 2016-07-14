@@ -36,11 +36,12 @@ struct TextBox
 
     int getWidth() { return this->pos.w; };
     void setPosition(Vector2 newPos);
+    Vector2 getPosition();
 };
 
 struct EditText
 {
-    SDL_Color backgroundColour;
+    uint32 backgroundColour;
     SDL_Rect pos;
 
     char *allowedCharacters;
@@ -60,9 +61,12 @@ struct EditText
 
 struct DropDownMenu
 {
-    //TODO(denis): probably don't always want 10 max
-    TextBox items[10];
+    TextBox *items;
     int itemCount;
+    int maxSize;
+    
+    uint32 backgroundColour;
+    uint32 textColour;
     
     int highlightedItem;
     SDL_Texture *unselectedTexture;
@@ -79,6 +83,7 @@ struct DropDownMenu
     void setPosition(Vector2 newPos);
     int getWidth() { return this->getRect().w; };
 
+    void addItem(char *newText, int position);
     void changeItem(char *newText, int position);
 };
 
@@ -160,22 +165,22 @@ void ui_eraseLetter(UIPanel *panel);
 //NOTE(denis): erases a letter from the given EditText
 void ui_eraseLetter(EditText *editText);
 
-TexturedRect ui_createTextField(char *text, int x, int y, SDL_Color colour);
-TextBox ui_createTextBox(char *text, int minWidth, int minHeight, SDL_Color textColour,
-			 Uint32 backgroundColour);
+TexturedRect ui_createTextField(char *text, int x, int y, uint32 colour);
+TextBox ui_createTextBox(char *text, int minWidth, int minHeight, uint32 textColour,
+			 uint32 backgroundColour);
 EditText ui_createEditText(int x, int y, int width, int height,
-			   SDL_Color backgroundColour, int padding);
+			   uint32 backgroundColour, int padding);
 //NOTE(denis): if the text area is larger than the given width or height, the
 // button will be made as big as needed to hold all the text
-Button ui_createTextButton(char *text, SDL_Color textColour, int width, int height,
-			   Uint32 backgroundColour);
+Button ui_createTextButton(char *text, uint32 textColour, int width, int height,
+			   uint32 backgroundColour);
 Button ui_createImageButton(char *imageFileName);
 DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
 				   int itemWidth, int itemHeight,
-				   SDL_Color textColour, Uint32 backgroundColour);
-MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 colour,
-			 Uint32 textColour);
-UIPanel ui_createPanel(int x, int y, int width, int height, Uint32 colour);
+				   uint32 textColour, uint32 backgroundColour);
+MenuBar ui_createMenuBar(int x, int y, int width, int height, uint32 colour,
+			 uint32 textColour);
+UIPanel ui_createPanel(int x, int y, int width, int height, uint32 colour);
 //NOTE(denis): if you don't pass a panel, it returns a new panel containing the item
 // you added
 UIPanel ui_addToPanel(EditText *editText);
@@ -211,8 +216,8 @@ void ui_draw(TextBox *textBox);
 void ui_draw(DropDownMenu *dropDownMenu);
 void ui_draw(MenuBar *menuBar);
 
-const SDL_Color COLOUR_WHITE = {255,255,255,255};
-const SDL_Color COLOUR_BLACK = {0,0,0,255};
-const SDL_Color COLOUR_RED = {255, 0, 0, 255};
+const uint32 COLOUR_WHITE = 0xFFFFFFFF;
+const uint32 COLOUR_BLACK = 0xFF000000;
+const uint32 COLOUR_RED = 0xFFFF0000;
 
 #endif

@@ -22,11 +22,11 @@ static inline int convertStringToInt(char string[], int size)
 }
 
 static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
-					     int width, int height, Uint32 colour)
+					     int width, int height, uint32 colour)
 {
     TexturedRect result = {};
 
-    Uint32 rmask, gmask, bmask, amask;
+    uint32 rmask, gmask, bmask, amask;
     amask = 0xFF000000;
     bmask = 0x00FF0000;
     gmask = 0x0000FF00;
@@ -54,7 +54,7 @@ static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
     return result;
 }
 
-static SDL_Color hexColourToRGBA(Uint32 hex)
+static SDL_Color hexColourToRGBA(uint32 hex)
 {
     SDL_Color result = {};
 

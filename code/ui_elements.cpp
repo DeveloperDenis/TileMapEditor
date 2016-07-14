@@ -115,6 +115,11 @@ void TextBox::setPosition(Vector2 newPos)
     this->text.pos.y = textY;
 }
 
+Vector2 TextBox::getPosition()
+{
+    return {this->pos.x, this->pos.y};
+}
+
 SDL_Rect DropDownMenu::getRect()
 {
     SDL_Rect result = {};
@@ -136,6 +141,42 @@ void DropDownMenu::setPosition(Vector2 newPos)
     this->items[0].setPosition(newPos);
 }
 
+void DropDownMenu::addItem(char *newText, int position)
+{
+    TextBox newItem = ui_createTextBox(newText, this->items[0].pos.w,
+				       this->items[0].pos.h, this->textColour,
+				       this->backgroundColour);
+    newItem.setPosition(this->items[0].getPosition());
+    
+    if (this->itemCount >= this->maxSize)
+    {
+        this->items = (TextBox*)growArray(this->items, this->maxSize,
+					  sizeof(TextBox), this->itemCount*2);
+	this->maxSize = this->itemCount*2;
+    }
+    
+    bool done = false;
+    for (int i = this->itemCount; i > 0 && !done; --i)
+    {
+	if (i == position)
+	{
+	    this->items[i] = newItem;
+	    done = true;
+	}
+	else
+	{
+	    this->items[i] = this->items[i-1];
+	}
+    }
+
+    if (!done)
+    {
+	this->items[0] = newItem;
+    }
+    
+    ++this->itemCount;
+}
+
 void DropDownMenu::changeItem(char *newText, int position)
 {
     if (position < this->itemCount)
@@ -151,7 +192,6 @@ void DropDownMenu::changeItem(char *newText, int position)
 void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
 {
     int height = this->botRight.y - this->topLeft.y;
-    SDL_Color textColour = hexColourToRGBA(this->textColour);
     
     this->menus[this->menuCount] = ui_createDropDownMenu(items, numItems, menuWidth,
 							 height, textColour,
@@ -652,14 +692,12 @@ void ui_delete(DropDownMenu *dropDownMenu)
 
 //TODO(denis): perhaps have multiple versions that do a different kind of
 // TTF_RenderText, like Shaded and Solid
-//TODO(denis): exchange everything to 0xAABBGGRR ? dunno
-// or have a setTextColour method instead of passing SDL_Color around
-// have a colour bitfield?
-TexturedRect ui_createTextField(char *text, int x, int y, SDL_Color colour)
+TexturedRect ui_createTextField(char *text, int x, int y, uint32 colour)
 {
     TexturedRect result = {};
-    
-    SDL_Surface* tempSurf = TTF_RenderText_Blended(_fonts[_selectedFont], text, colour);
+
+    SDL_Color sdlColour = hexColourToRGBA(colour);
+    SDL_Surface* tempSurf = TTF_RenderText_Blended(_fonts[_selectedFont], text, sdlColour);
 
     SDL_GetClipRect(tempSurf, &result.pos);
     result.pos.x = x;
@@ -671,9 +709,8 @@ TexturedRect ui_createTextField(char *text, int x, int y, SDL_Color colour)
     return result;
 }
 
-//TODO(denis): really don't like this mismatch of SDL_Color and Uint32
 TextBox ui_createTextBox(char *text, int minWidth, int minHeight,
-			 SDL_Color textColour, Uint32 backgroundColour)
+			 uint32 textColour, uint32 backgroundColour)
 {
     TextBox result = {};
 
@@ -692,7 +729,7 @@ TextBox ui_createTextBox(char *text, int minWidth, int minHeight,
 
 //TODO(denis): have a function with a "default text" parameter
 EditText ui_createEditText(int x, int y, int width, int height,
-			   SDL_Color backgroundColour, int padding)
+			   uint32 backgroundColour, int padding)
 {
     EditText result = {};
     result.backgroundColour = backgroundColour;
@@ -704,16 +741,16 @@ EditText ui_createEditText(int x, int y, int width, int height,
     return result;
 }
 
-Button ui_createTextButton(char *text, SDL_Colour textColour,
-			   int width, int height, Uint32 backgroundColour)
+Button ui_createTextButton(char *text, uint32 textColour,
+			   int width, int height, uint32 backgroundColour)
 {
     Button result = {};
 
     result.text = text;
     result.foreground = ui_createTextField(text, 0, 0, textColour);
     
-    int bgWidth = max(width, result.foreground.pos.w) + 5;
-    int bgHeight = max(height, result.foreground.pos.h) + 5;
+    int bgWidth = MAX(width, result.foreground.pos.w) + 5;
+    int bgHeight = MAX(height, result.foreground.pos.h) + 5;
     result.background = createFilledTexturedRect(_renderer, bgWidth, bgHeight,
 						 backgroundColour);
 
@@ -734,7 +771,7 @@ Button ui_createImageButton(char *imageFileName)
 //TODO(denis): define some function/macro or something to simplify this colour nonsense
 DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
 				   int itemWidth, int itemHeight,
-				   SDL_Color textColour, Uint32 backgroundColour)
+				   uint32 textColour, uint32 backgroundColour)
 {
     DropDownMenu result = {};
     //TODO(denis): don't hardcode selection colour
@@ -743,8 +780,9 @@ DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
     result.selectionBox = createFilledTexturedRect(_renderer, itemWidth, itemHeight,
 						   selectionColour).image;
     
-    //TODO(denis): since result.items is only length 10 this could cause issues
     result.itemCount = itemNum;
+    result.maxSize = itemNum;
+    result.items = (TextBox*)growArray(result.items, 0, sizeof(TextBox), itemNum);
     
     for (int i = 0; i < result.itemCount; ++i)
     {
@@ -756,8 +794,8 @@ DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
     return result;
 }
 
-MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 backgroundColour,
-			 Uint32 textColour)
+MenuBar ui_createMenuBar(int x, int y, int width, int height, uint32 backgroundColour,
+			 uint32 textColour)
 {
     MenuBar result = {};
     result.topLeft.x = x;
@@ -770,7 +808,7 @@ MenuBar ui_createMenuBar(int x, int y, int width, int height, Uint32 backgroundC
     return result;
 }
 
-UIPanel ui_createPanel(int x, int y, int width, int height, Uint32 colour)
+UIPanel ui_createPanel(int x, int y, int width, int height, uint32 colour)
 {
     UIPanel result = {};
     result.visible = true;
@@ -911,7 +949,7 @@ void ui_draw(EditText *editText)
 {
     if (editText)
     {
-	SDL_Color c = editText->backgroundColour;
+	SDL_Color c = hexColourToRGBA(editText->backgroundColour);
 	SDL_SetRenderDrawColor(_renderer, c.r, c.g, c.b, c.a);
 	SDL_RenderFillRect(_renderer, &editText->pos);
 
@@ -957,7 +995,7 @@ void ui_draw(DropDownMenu *dropDownMenu)
 	    
 	    for (int i = startValue; i < dropDownMenu->itemCount; ++i)
 	    {
-		if (dropDownMenu->items[i].background != NULL)
+		if (dropDownMenu->items && dropDownMenu->items[i].background != NULL)
 		{
 		    if (i == dropDownMenu->highlightedItem)
 		    {
