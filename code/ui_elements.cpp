@@ -115,18 +115,14 @@ void TextBox::setPosition(Vector2 newPos)
     this->text.pos.y = textY;
 }
 
-Vector2 TextBox::getPosition()
+inline Vector2 TextBox::getPosition()
 {
     return {this->pos.x, this->pos.y};
 }
 
-SDL_Rect DropDownMenu::getRect()
+inline SDL_Rect DropDownMenu::getRect()
 {
-    SDL_Rect result = {};
-    result.x = this->items[0].pos.x;
-    result.y = this->items[0].pos.y;
-    result.w = this->items[0].pos.w;
-    result.h = this->items[0].pos.h;
+    SDL_Rect result = this->items[0].pos;
     
     if (this->isOpen)
     {
@@ -136,13 +132,14 @@ SDL_Rect DropDownMenu::getRect()
     return result;
 }
 
-void DropDownMenu::setPosition(Vector2 newPos)
+inline void DropDownMenu::setPosition(Vector2 newPos)
 {
     this->items[0].setPosition(newPos);
 }
 
 void DropDownMenu::addItem(char *newText, int position)
 {
+    //TODO(denis): adding at zero might not work?
     TextBox newItem = ui_createTextBox(newText, this->items[0].pos.w,
 				       this->items[0].pos.h, this->textColour,
 				       this->backgroundColour);

@@ -42,7 +42,7 @@ static inline bool charInArray(char c, char array[])
 }
 
 //NOTE(denis): only works for valid strings
-static bool stringsEqual(char *A, char *B)
+static inline bool stringsEqual(char *A, char *B)
 {
     bool result = true;
 
@@ -61,7 +61,7 @@ static bool stringsEqual(char *A, char *B)
     return result;
 }
 
-static uint8* growArray(void *array, int arrayLength, int typeSize, int newLength)
+static inline uint8* growArray(void *array, int arrayLength, int typeSize, int newLength)
 {
     uint8 *newArray = (uint8*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
 					typeSize*newLength);

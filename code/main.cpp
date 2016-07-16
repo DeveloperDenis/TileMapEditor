@@ -39,9 +39,14 @@
 struct TileSet
 {
     char *name;
-    SDL_Rect pos;
+
+    //TODO(denis): should this just be a width + height property?
+    SDL_Rect imageSize;
+    
     SDL_Texture *image;
     uint32 tileSize;
+
+    SDL_Rect collisionBox;
 };
 
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
@@ -53,34 +58,28 @@ static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
     return result;
 }
 
-static bool moveSelectionBox(TexturedRect *selectionBox, Vector2 mouse,
-			     TileMap *tileMap, TexturedRect *otherArea)
+static bool moveSelectionInRect(TexturedRect *selectionBox, Vector2 mousePos,
+				SDL_Rect *rect, uint32 tileSize)
 {
     bool shouldBeDrawn = true;
     
     if (selectionBox->image != NULL)
-    {	
-	Uint32 tileSize = tileMap->tileSize;
-
-	if (pointInRect(mouse, tileMap->getRect()))
+    {
+	if (pointInRect(mousePos, *rect))
 	{
-	    Vector2 newPos = ((mouse - tileMap->offset)/tileSize) * tileSize + tileMap->offset;
+	    Vector2 offset = {rect->x, rect->y};
+	    Vector2 newPos = ((mousePos - offset)/tileSize) * tileSize + offset;
+	    
 	    selectionBox->pos.x = newPos.x;
 	    selectionBox->pos.y = newPos.y;
-	}
-	else if (pointInRect(mouse, otherArea->pos))
-	{
-	    Vector2 otherPos = {otherArea->pos.x, otherArea->pos.y};
-
-	    Vector2 newPos = (mouse - otherPos)/tileSize * tileSize + otherPos;
-	    selectionBox->pos.x = newPos.x;
-	    selectionBox->pos.y = newPos.y;
+	    selectionBox->pos.h = tileSize;
+	    selectionBox->pos.w = tileSize;
 	}
 	else
 	    shouldBeDrawn = false;
     }
 
-    return shouldBeDrawn;
+    return shouldBeDrawn;    
 }
 
 static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tileMap,
@@ -184,9 +183,9 @@ int main(int argc, char* argv[])
 	    tileMap.offset = {5, 5};
 
 	    bool selectionVisible = false;
+	    //TODO(denis): do I use this?
 	    Vector2 startSelectPos = {};
 	    TexturedRect selectionBox = {};
-	    TexturedRect selectedTile = {};
 
 	    //NOTE(denis): setting up the top bar
 	    ui_setFont(menuFontName, menuFontSize);
@@ -318,7 +317,23 @@ int main(int argc, char* argv[])
 		tileSetDropDown.setPosition(newPos);
 	    }
 	    ui_addToPanel(&tileSetDropDown, &tileSetPanel);
-	    	
+
+	    TexturedRect selectedTileText = {};
+	    {
+		int x = tileSetDropDown.getRect().x;
+		
+	        selectedTileText =
+		    ui_createTextField("Selected Tile:", x, 0, COLOUR_BLACK);
+		int y = tileSetPanel.panel.pos.y + tileSetPanel.getHeight() -
+		    selectedTileText.pos.h - 15;
+		selectedTileText.pos.y = y;
+	    }
+
+	    SDL_Rect tempSelectedTile = {};
+	    Tile selectedTile = {};
+	    selectedTile.pos.x = selectedTileText.pos.x + selectedTileText.pos.w + 15;
+	    selectedTile.pos.y = selectedTileText.pos.y;
+	    
 	    const enum { PAINT_TOOL,
 		   FILL_TOOL
 	    };
@@ -392,13 +407,27 @@ int main(int argc, char* argv[])
 			    topMenuBar.onMouseMove(mouse);
 
 
-			    if (tileSetPanel.visible && tileSetDropDown.isOpen)
+			    if (tileSetPanel.visible)
 			    {
-				if (pointInRect(mouse, tileSetDropDown.getRect()))
+				if (tileSetDropDown.isOpen &&
+				    pointInRect(mouse, tileSetDropDown.getRect()))
 				{
 				    int highlighted =
 					(mouse.y - tileSetDropDown.getRect().y) / tileSetDropDown.items[0].pos.h;
 				    tileSetDropDown.highlightedItem = highlighted;
+				}
+				else if (!tileSetDropDown.isOpen)
+				{
+				    if (selectionBox.pos.w != 0 && selectionBox.pos.h != 0 &&
+					tileSets[0].tileSize != 0 &&
+					tileSets[0].collisionBox.w != 0 &&
+					tileSets[0].collisionBox.h != 0)
+				    {
+					selectionVisible =
+					    moveSelectionInRect(&selectionBox, mouse,
+								&tileSets[0].collisionBox,
+								tileSets[0].tileSize);
+				    }
 				}
 			    }
 			    
@@ -481,8 +510,6 @@ int main(int argc, char* argv[])
 			    
 			    newTileMapPanelRespondToMouseDown(mouse, mouseButton);
 
-			    
-			    //TODO(denis): testing tile set panel
 			    tileSetDropDown.startedClick =
 				pointInRect(mouse, tileSetDropDown.getRect());
 			    
@@ -491,7 +518,6 @@ int main(int argc, char* argv[])
 			    // etc..
 			    fillToolIcon.startedClick = pointInRect(mouse, fillToolIcon.background.pos);
 			    paintToolIcon.startedClick = pointInRect(mouse, paintToolIcon.background.pos);
-			    //currentTileSet.startedClick = pointInRect(mouse, currentTileSet.background.pos);
 			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
 
 			    topMenuBar.onMouseDown(mouse, event.button.button);
@@ -559,6 +585,9 @@ int main(int argc, char* argv[])
 				}
 				else if (ui_wasClicked(openButton, mouse))
 				{
+				    //TODO(denis): tile size should be fixed to the
+				    // size of the tile map tile size
+				    // if a tile map has been created
 				    int tileSize =
 					convertStringToInt(tileSizeEditText.text,
 							   tileSizeEditText.letterCount);
@@ -601,7 +630,7 @@ int main(int argc, char* argv[])
 					    //TODO(denis): currentTileSet.name has to be freed if ever
 					    // the tileset is deleted
 					    tileSets[numTileSets].name = fileNameTruncated;
-					    tileSets[numTileSets].pos = newTileSheet.pos;
+					    tileSets[numTileSets].imageSize = newTileSheet.pos;
 					    tileSets[numTileSets].image = newTileSheet.image;
 					    tileSets[numTileSets].tileSize = tileSize;
 					    ++numTileSets;
@@ -614,13 +643,35 @@ int main(int argc, char* argv[])
 					    }
 					    else
 					    {
-						//TODO(denis): make it so that after you
-						// load a new tile set it becomes the
-						// selected tile set
-						tileSetDropDown.addItem(fileNameTruncated, tileSetDropDown.itemCount-1);
+						int newPos = tileSetDropDown.itemCount-1;
+						tileSetDropDown.addItem(fileNameTruncated, newPos);
+
+						SWAP_DATA(tileSets[newPos], tileSets[0], TileSet);
+
+						tileSetDropDown.items[newPos].setPosition(tileSetDropDown.items[0].getPosition());
+						SWAP_DATA(tileSetDropDown.items[newPos],
+							  tileSetDropDown.items[0],
+							  TextBox);
 					    }
+
+					    selectedTile.pos.w = tileSize;
+					    selectedTile.pos.h = tileSize;
+					    selectedTile.sheetPos.x = 0;
+					    selectedTile.sheetPos.y = 0;
+					    selectedTile.sheetPos.w = tileSize;
+					    selectedTile.sheetPos.h = tileSize;
+					    
+					    selectedTileText.pos.y =
+						tileSetPanel.panel.pos.y + tileSetPanel.getHeight() -
+						selectedTileText.pos.h - 15 - tileSize/2;
+					    selectedTile.pos.y = selectedTileText.pos.y - tileSize/2 + selectedTileText.pos.h/2;
 					    
 					    importTileSetPanel.visible = false;
+
+					    //TODO(denis): do this if a tile map hasn't
+					    // been made
+					    selectionBox = createFilledTexturedRect(
+						renderer, tileSize, tileSize, 0x77FFFFFF);
 					}
 					else
 					{
@@ -651,7 +702,17 @@ int main(int argc, char* argv[])
 			    }
 			    else if (topMenuBar.onMouseUp(mouse, event.button.button))
 			    {
-				//TODO(denis): top bar was clicked
+				if (pointInRect(mouse, topMenuBar.menus[0].getRect()))
+				{
+				    //NOTE(denis): clicked on the file menu
+				    int selectionY = (mouse.y - topMenuBar.menus[0].getRect().y)/topMenuBar.menus[0].items[0].pos.h;
+				    if (selectionY == 3)
+				    {
+					//NOTE(denis): 3 = "import tile sheet"
+					importTileSetPanel.visible = true;
+					topMenuBar.menus[0].isOpen = false;
+				    }
+				}
 			    }
 			    else if (newTileMapPanelVisible())
 			    {
@@ -677,6 +738,9 @@ int main(int argc, char* argv[])
 					    SWAP_DATA(tileSetDropDown.items[selection],
 						     tileSetDropDown.items[0],
 						     TextBox);
+
+					    selectedTile.sheetPos.x = 0;
+					    selectedTile.sheetPos.y = 0;
 					}
 				    }
 
@@ -688,6 +752,10 @@ int main(int argc, char* argv[])
 				{
 				    tileSetDropDown.isOpen = true;
 				    tileSetDropDown.highlightedItem = 0;
+				}
+				else if (selectionVisible)
+				{
+				    selectedTile.sheetPos = tempSelectedTile;
 				}
 				
 			    }
@@ -712,19 +780,7 @@ int main(int argc, char* argv[])
 				    }
 				}
 			    }
-#if 0
-			    if (tileMap.tiles && ui_wasClicked(currentTileSet, mouse))
-			    {
-				selectedTile.pos.x = (selectionBox.pos.x - currentTileSet.background.pos.x)/tileMap.tileSize * tileMap.tileSize;
-				selectedTile.pos.y = (selectionBox.pos.y - currentTileSet.background.pos.y)/tileMap.tileSize * tileMap.tileSize;
-				selectedTile.pos.w = tileMap.tileSize;
-				selectedTile.pos.h = tileMap.tileSize;
-				
-				selectedTile.image = currentTileSet.background.image;
 
-				currentTileSet.startedClick = false;
-			    }
-#endif
 			    //NOTE(denis): hit the save button
 			    if (tileMap.tiles && saveButton.startedClick)
 			    {
@@ -878,9 +934,6 @@ int main(int argc, char* argv[])
 						 0xFFFFFFFF);
 			item1.setPosition({menuX, menuY});
 
-			selectionBox = createFilledTexturedRect(
-			    renderer, tileMap.tileSize, tileMap.tileSize, 0x77FFFFFF);
-
 			saveButton = ui_createTextButton("Save", COLOUR_WHITE,
 							 100, 50, 0xFF33AA88);
 		    }
@@ -894,37 +947,59 @@ int main(int argc, char* argv[])
 		    {
 			int tileSize = tileSets[0].tileSize;
 			int tilesPerRow = (tileSetPanel.getWidth() - 30)/tileSize;
-
+			
 			int tilesPadding = (tileSetPanel.getWidth() - tilesPerRow*tileSize)/2;
 			int tileSetStartX = tileSetPanel.panel.pos.x + tilesPadding;
 			int tileSetStartY = tileSetDropDown.items[0].pos.y + tileSetDropDown.items[0].pos.h + 15;
-
+			
 			//TODO(denis): bundle these up into a Tile struct
 			SDL_Rect currentTileInSheet =
 			    {0, 0, tileSize, tileSize};
 			SDL_Rect currentTileOnScreen =
 			    {tileSetStartX, tileSetStartY,
 			     tileSize, tileSize};
+			
+			int numTilesY = tileSets[0].imageSize.h/tileSize;
+			int numTilesX = tileSets[0].imageSize.w/tileSize;
 
-			int numTilesY = tileSets[0].pos.h/tileSize;
-			int numTilesX = tileSets[0].pos.w/tileSize;
-			    
+			uint32 lastY = 0;
+			
 			for (int i = 0; i < numTilesY; ++i)
 			{
 			    for (int j = 0; j < numTilesX; ++j)
 			    {
 				//TODO(denis): don't change the position of the next
 				// drawn tile if the tile sheet position is blank
-			    
+				
 				currentTileInSheet.x = j * tileSize;
 				currentTileInSheet.y = i * tileSize;
-
+				
 				currentTileOnScreen.x = tileSetStartX + ((i*numTilesX + j) % tilesPerRow)*tileSize;
 			        currentTileOnScreen.y = tileSetStartY + ((i*numTilesX + j)/tilesPerRow)*tileSize;
+
+				lastY = currentTileOnScreen.y;
+
+				tempSelectedTile.w = tempSelectedTile.h = tileSize;
+				if (currentTileOnScreen.x == selectionBox.pos.x &&
+				    currentTileOnScreen.y == selectionBox.pos.y)
+				{
+				    tempSelectedTile.x = currentTileInSheet.x;
+				    tempSelectedTile.y = currentTileInSheet.y;
+				}
 				
 				SDL_RenderCopy(renderer, tileSets[0].image, &currentTileInSheet, &currentTileOnScreen);
 			    }
 			}
+
+			//TODO(denis): the height is wrong if there are a bunch of
+			// blank tiles being "drawn"
+			tileSets[0].collisionBox.x = tileSetStartX;
+			tileSets[0].collisionBox.y = tileSetStartY;
+			tileSets[0].collisionBox.w = tilesPerRow*tileSize;
+			tileSets[0].collisionBox.h = lastY - tileSetStartY;
+			
+			ui_draw(&selectedTileText);
+		        SDL_RenderCopy(renderer, tileSets[0].image, &selectedTile.sheetPos, &selectedTile.pos);
 		    }
 
 		    //TODO(denis): bad fix for the drawing order problem
@@ -958,9 +1033,6 @@ int main(int argc, char* argv[])
 		    }
 
 		    SDL_DestroyTexture(defaultTile.image);
-		    
-		    if (selectionVisible)
-			SDL_RenderCopy(renderer, selectionBox.image, NULL, &selectionBox.pos);
 
 		    //TODO(denis): testing drop down menu
 		    ++menuPause;
@@ -989,6 +1061,9 @@ int main(int argc, char* argv[])
 			ui_draw(dropDown[selectedItem]);
 		    }
 		}
+
+		if (selectionVisible)
+		    SDL_RenderCopy(renderer, selectionBox.image, NULL, &selectionBox.pos);
 		
 		ui_draw(&topMenuBar);
 

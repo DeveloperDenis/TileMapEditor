@@ -82,7 +82,8 @@ struct DropDownMenu
     SDL_Rect getRect();
     void setPosition(Vector2 newPos);
     int getWidth() { return this->getRect().w; };
-
+    int getHeight() { return this->getRect().h; };
+    
     void addItem(char *newText, int position);
     void changeItem(char *newText, int position);
 };
@@ -142,6 +143,7 @@ struct UIPanel
     TexturedRect panel;
 
     int getWidth() { return this->panel.pos.w; };
+    int getHeight() { return this->panel.pos.h; };
 };
 
 bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize);
