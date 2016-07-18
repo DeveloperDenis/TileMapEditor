@@ -14,6 +14,8 @@
 static UIPanel _panel;
 
 static bool _newTileMapClicked;
+
+static Button _cancelButton;
 static Button _createButton;
 
 static TexturedRect _tileMapNameText;
@@ -86,8 +88,8 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
     //TODO(denis): use the maxWidth and maxHeight to decide the sizes for things
     int tileNameWidth = 200;
     int editTextWidth = 50;
-    int createButtonWidth = 100;
-    int createButtonHeight = 50;
+    int buttonWidth = 100;
+    int buttonHeight = 50;
     
     ui_setFont("LiberationMono-Regular.ttf", 16);
     
@@ -158,8 +160,12 @@ void createNewTileMapPanel(int startX, int startY, int maxWidth, int maxHeight)
     ui_addToPanel(&_tilesText2, &_panel);	    
     
     //NOTE(denis): fifth row
+    _cancelButton = ui_createTextButton("Cancel", COLOUR_WHITE, buttonWidth,
+					buttonHeight, BUTTON_COLOUR);
+    ui_addToPanel(&_cancelButton, &_panel);
+    
     _createButton  = ui_createTextButton("Create New Map", COLOUR_WHITE,
-			    createButtonWidth, createButtonHeight, BUTTON_COLOUR);
+					 buttonWidth, buttonHeight, BUTTON_COLOUR);
     ui_addToPanel(&_createButton, &_panel);
 
     newTileMapPanelSetPosition({startX, startY});
@@ -208,7 +214,9 @@ void newTileMapPanelSetPosition(Vector2 newPos)
     rowY += _heightText.pos.h;
     int centreY = rowY + (height-(rowY-newPos.y))/2 - _createButton.background.pos.h/2;
     int centreX = newPos.x + width/2 - _createButton.getWidth()/2;
-    _createButton.setPosition({centreX, centreY});
+
+    _cancelButton.setPosition({centreX-_cancelButton.getWidth()/2-15, centreY});
+    _createButton.setPosition({centreX+_createButton.getWidth()/2+15, centreY});
 }
 
 int newTileMapPanelGetWidth()
@@ -230,6 +238,7 @@ void newTileMapPanelRespondToMouseUp(Vector2 mousePos, uint8 mouseButton)
     ui_processMouseUp(&_panel, mousePos, mouseButton);
 
     _newTileMapClicked = ui_wasClicked(_createButton, mousePos);
+    _panel.visible = !ui_wasClicked(_cancelButton, mousePos);
 }
 
 void newTileMapPanelSelectNext()

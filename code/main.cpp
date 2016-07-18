@@ -1,7 +1,7 @@
 /* TODO(denis):
  * in the beginning, check the resolution of the user's monitor, and don't allow them
  * to make tile maps that would be too big!
- *
+ * SDL_GetDisplayUsableBounds
  * (support saving to different formats as well?)
  *
  * loading a tilemap
@@ -13,6 +13,8 @@
  * CTRL + O -> open tile map
  * CTRL + S -> save current tile map
  * etc...
+ *
+ * DISABLE top menu bar when popup is visible
  */
 
 //IMPORTANT(denis): note to self, design everything expecting at least a 1280 x 720
@@ -58,16 +60,22 @@ static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
     return result;
 }
 
+static void initializeSelectionBox(SDL_Renderer *renderer,
+				   TexturedRect *selectionBox, uint32 tileSize)
+{
+    *selectionBox = createFilledTexturedRect(renderer, tileSize, tileSize, 0x77FFFFFF);
+}
+
 static bool moveSelectionInRect(TexturedRect *selectionBox, Vector2 mousePos,
-				SDL_Rect *rect, uint32 tileSize)
+				SDL_Rect rect, uint32 tileSize)
 {
     bool shouldBeDrawn = true;
     
     if (selectionBox->image != NULL)
     {
-	if (pointInRect(mousePos, *rect))
+	if (pointInRect(mousePos, rect))
 	{
-	    Vector2 offset = {rect->x, rect->y};
+	    Vector2 offset = {rect.x, rect.y};
 	    Vector2 newPos = ((mousePos - offset)/tileSize) * tileSize + offset;
 	    
 	    selectionBox->pos.x = newPos.x;
@@ -82,39 +90,14 @@ static bool moveSelectionInRect(TexturedRect *selectionBox, Vector2 mousePos,
     return shouldBeDrawn;    
 }
 
-static void reorientEditingArea(int windowWidth, int windowHeight, TileMap *tileMap,
-				int *menuX, int *menuY)
-{   
-    int widthSpace = windowWidth - tileMap->tileSize*tileMap->widthInTiles;
-    int heightSpace = windowHeight - tileMap->tileSize*tileMap->heightInTiles;
-
-    int padding = 30;
-    if (widthSpace > heightSpace)
-    {
-	int offsetY = windowHeight/2 - tileMap->tileSize*tileMap->heightInTiles/2;
-	tileMap->offset = {padding, offsetY};
-    }
-    else
-    {
-        int offsetX = windowWidth/2 - tileMap->tileSize*tileMap->widthInTiles/2;
-	tileMap->offset = {offsetX, padding};
-    }
-
-    //TODO(denis): hard-coding not good
-    *menuY = tileMap->offset.y - 50;
-    *menuX = tileMap->offset.x + 10;
-}
-
 static TileMap createNewTileMap(int startX, int startY)
 {
     TileMap newTileMap = {};
     newTileMap.offset.x = startX;
     newTileMap.offset.y = startY;
     
-    //TODO(denis): maybe this should move out?
     NewTileMapPanelData* data = newTileMapPanelGetData();
-    newTileMapPanelSetVisible(false);
-
+    
     newTileMap.widthInTiles = data->widthInTiles;
     newTileMap.heightInTiles = data->heightInTiles;
     newTileMap.tileSize = data->tileSize;
@@ -175,15 +158,12 @@ int main(int argc, char* argv[])
 	{   
 	    bool running = true;
 	    
-	    Button saveButton = {};
-	    
 	    char *tileMapName = NULL;
 
 	    TileMap tileMap = {};
 	    tileMap.offset = {5, 5};
 
 	    bool selectionVisible = false;
-	    //TODO(denis): do I use this?
 	    Vector2 startSelectPos = {};
 	    TexturedRect selectionBox = {};
 
@@ -193,27 +173,16 @@ int main(int argc, char* argv[])
 	    MenuBar topMenuBar = ui_createMenuBar(0, 0, WINDOW_WIDTH, 20,
 						  0xFFCCCCCC, 0xFF000000);
 	    
-	    char *items[] = {"File", "Open Tile Map...", "Save Tile Map...",
-			     "Import Tile Sheet...", "Exit"};	     
-	    topMenuBar.addMenu(items, 5, 225);
+	    char *items[] = {"File", "Create New Tile Map", "Open Tile Map...",
+			     "Save Tile Map...", "Import Tile Sheet...", "Exit"};	     
+	    topMenuBar.addMenu(items, 6, 225);
 	    
 	    items[0] = "Tile Maps";
 	    items[1] = "Create New";
 	    items[2] = "NOT FINAL";
 	    topMenuBar.addMenu(items, 3, 225);
 	    
-	    TextBox item1 = {};
-	    TextBox item2 = {};
-	    TextBox item3 = {};
-
-	    TextBox *dropDown[] = {&item1, &item2, &item3};
-	    bool menuOpen = false;
-	    int menuX = 0;
-	    int menuY = 0;
-	    int selectedItem = 0;
-	    int menuLength = 3;
-	    int menuPause = 0;
-
+	    //NOTE(denis): create new tile map panel
 	    ui_setFont(defaultFontName, defaultFontSize);
 	    
 	    {
@@ -224,8 +193,7 @@ int main(int argc, char* argv[])
 		newTileMapPanelSetVisible(false);
 	    }
 
-	    //NOTE(denis): this is for the pop up window that appears when you
-	    // click "import tile sheet"
+	    //NOTE(denis): import tile sheet panel
 	    UIPanel importTileSetPanel = {};
 	    {
 		int width = 950;
@@ -286,7 +254,7 @@ int main(int argc, char* argv[])
 	    TexturedRect warningText = {};
 	    ui_addToPanel(&warningText, &importTileSetPanel);
 
-
+	    //NOTE(denis): tile set panel
 	    TileSet tileSets[15] = {};
 	    int numTileSets = 0;
 	    
@@ -333,15 +301,49 @@ int main(int argc, char* argv[])
 	    Tile selectedTile = {};
 	    selectedTile.pos.x = selectedTileText.pos.x + selectedTileText.pos.w + 15;
 	    selectedTile.pos.y = selectedTileText.pos.y;
+
+	    //NOTE(denis): tile map panel
+	    UIPanel tileMapPanel = {};
+	    {
+		int x = 15;
+		int y = topMenuBar.botRight.y + 15;
+		int width = 800;
+		int height = WINDOW_HEIGHT - y - 15;
+		uint32 colour = 0xFFEE2288;
+	        tileMapPanel = ui_createPanel(x, y, width, height, colour);
+	    }
+
+	    Button createNewTileMapButton =
+		ui_createTextButton("Create New Tile Map", COLOUR_WHITE, 0, 0,
+				    0xFFFF0000);
+	    {
+		int x = tileMapPanel.panel.pos.x + tileMapPanel.getWidth()/2 -
+		    createNewTileMapButton.getWidth()/2;
+		int y = tileMapPanel.panel.pos.y + tileMapPanel.getHeight()/2 -
+		    createNewTileMapButton.getHeight()/2;
+		createNewTileMapButton.setPosition({x, y});
+	    }
 	    
-	    const enum { PAINT_TOOL,
+	    Button saveButton = {};
+	    
+	    const enum ToolType{ PAINT_TOOL,
 		   FILL_TOOL
 	    };
-	    Uint32 currentTool = FILL_TOOL;
+	    ToolType currentTool = PAINT_TOOL;
 	    
 	    Button paintToolIcon = ui_createImageButton("paint-brush-icon-32.png");
 	    Button fillToolIcon = ui_createImageButton("paint-can-icon-32.png");
 
+	    {
+		int x = tileMapPanel.panel.pos.x + tileMapPanel.getWidth() - paintToolIcon.getWidth() - 15;
+		int y = tileMapPanel.panel.pos.y + 15;
+		paintToolIcon.setPosition({x, y});
+		fillToolIcon.setPosition({x, y+paintToolIcon.getHeight() + 5});
+	    }
+	    ui_addToPanel(&paintToolIcon, &tileMapPanel);
+	    ui_addToPanel(&fillToolIcon, &tileMapPanel);
+	    
+	    
 	    while (running)
 	    {
 		SDL_Event event;
@@ -364,26 +366,10 @@ int main(int argc, char* argv[])
 
 			        topMenuBar.botRight.x =
 				    topMenuBar.topLeft.x + windowWidth;
-				
-				if (tileMap.tiles)
-				{
-				    reorientEditingArea(windowWidth, windowHeight, &tileMap,
-							&menuX, &menuY);
-				    
-				    Tile *row = tileMap.tiles;
-				    for (int i = 0; i < tileMap.heightInTiles; ++i)
-				    {
-					Tile *element = row;
-					for (int j = 0; j < tileMap.widthInTiles; ++j)
-					{
-					    element->pos.x = tileMap.offset.x + j*tileMap.tileSize;
-					    element->pos.y = tileMap.offset.y + i*tileMap.tileSize;
-					    ++element;
-					}
-					row += tileMap.widthInTiles;
-				    }
-				}
 
+				//TODO(denis): resize all the panels here
+
+				
 				//TODO(denis): might want to resize the new tile map
 				// panel here
 				if (newTileMapPanelVisible())
@@ -407,6 +393,7 @@ int main(int argc, char* argv[])
 			    topMenuBar.onMouseMove(mouse);
 
 
+			    bool changedSelection = false;
 			    if (tileSetPanel.visible)
 			    {
 				if (tileSetDropDown.isOpen &&
@@ -425,17 +412,23 @@ int main(int argc, char* argv[])
 				    {
 					selectionVisible =
 					    moveSelectionInRect(&selectionBox, mouse,
-								&tileSets[0].collisionBox,
+								tileSets[0].collisionBox,
 								tileSets[0].tileSize);
+					changedSelection = selectionVisible;
 				    }
 				}
 			    }
 			    
-			    if (currentTool == PAINT_TOOL && tileMap.tiles)
+			    if (currentTool == PAINT_TOOL && tileMapPanel.visible &&
+				tileMap.tiles)
 			    {
-#if 0
-				selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &tileSets[0].pos);
-
+				if (selectionBox.pos.w != 0 && selectionBox.pos.h != 0 &&
+				    !changedSelection)
+				{
+				    selectionVisible = moveSelectionInRect(&selectionBox, mouse,
+									   tileMap.getRect(), tileMap.tileSize);
+				}
+				
 				if (event.motion.state & SDL_BUTTON_LMASK)
 				{
 				    if (pointInRect(mouse, tileMap.getRect()))
@@ -447,9 +440,9 @@ int main(int argc, char* argv[])
 					clicked->sheetPos = selectedTile.pos;
 				    }
 				}
-#endif
 			    }
-			    else if (currentTool == FILL_TOOL && tileMap.tiles)
+			    else if (currentTool == FILL_TOOL && tileMapPanel.visible &&
+				     tileMap.tiles)
 			    {	
 				if (event.motion.state & SDL_BUTTON_LMASK &&
 				    startSelectPos != Vector2{0,0})
@@ -498,7 +491,8 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-				    //selectionVisible = moveSelectionBox(&selectionBox, mouse, &tileMap, &currentTileSet.background);
+				    if (!changedSelection)
+					selectionVisible = moveSelectionInRect(&selectionBox, mouse, tileMap.getRect(), tileMap.tileSize);
 				}
 			    }
 			} break;
@@ -507,61 +501,74 @@ int main(int argc, char* argv[])
 			{
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
-			    
-			    newTileMapPanelRespondToMouseDown(mouse, mouseButton);
-
-			    tileSetDropDown.startedClick =
-				pointInRect(mouse, tileSetDropDown.getRect());
-			    
-			    //TODO(denis): replace this with the ui call
-			    //TODO(denis): only do this if the top bar isn't clicked,
-			    // etc..
-			    fillToolIcon.startedClick = pointInRect(mouse, fillToolIcon.background.pos);
-			    paintToolIcon.startedClick = pointInRect(mouse, paintToolIcon.background.pos);
-			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
-
-			    topMenuBar.onMouseDown(mouse, event.button.button);
 
 			    if (importTileSetPanel.visible)
+			    {
 				ui_processMouseDown(&importTileSetPanel, mouse, mouseButton);
-			    
-			    if (menuPause > 15 &&
-				currentTool == PAINT_TOOL && tileMap.tiles)
-			    {
-				if (event.button.button == SDL_BUTTON_LEFT)
-				{			    
-				    if (pointInRect(mouse, tileMap.getRect()))
-				    {
-					Vector2 tilePos =
-					    convertScreenPosToTilePos(&tileMap, mouse);
-
-					Tile *clicked = tileMap.tiles + tilePos.x + tilePos.y*tileMap.widthInTiles;
-					clicked->sheetPos = selectedTile.pos;
-				    }
-				}
 			    }
-			    else if (currentTool == FILL_TOOL && tileMap.tiles)
+			    else if (newTileMapPanelVisible())
 			    {
-				if (event.button.button == SDL_BUTTON_LEFT)
+				newTileMapPanelRespondToMouseDown(mouse, mouseButton);
+			    }
+			    else if (tileSetPanel.visible || tileMapPanel.visible)
+			    {
+				if (tileSetPanel.visible)
 				{
-				    if (pointInRect(mouse, tileMap.getRect()))
-				    {
-					Vector2 tilePos =
-					    convertScreenPosToTilePos(&tileMap, mouse);
+				    tileSetDropDown.startedClick =
+					pointInRect(mouse, tileSetDropDown.getRect());
+				}
 
-					startSelectPos = tileMap.offset + tilePos*tileMap.tileSize;
-					
-					selectionBox.pos.x = startSelectPos.x;
-					selectionBox.pos.y = startSelectPos.y;
-					selectionBox.pos.w = tileMap.tileSize;
-					selectionBox.pos.h = tileMap.tileSize;
-				    }
-				    else
+				if (tileMapPanel.visible)
+				{
+				    ui_processMouseDown(&tileMapPanel, mouse, mouseButton);
+				    
+				    createNewTileMapButton.startedClick =
+					pointInRect(mouse, createNewTileMapButton.background.pos);
+
+				    if (currentTool == PAINT_TOOL && tileMap.tiles)
 				    {
-					startSelectPos = {0, 0};
+					if (event.button.button == SDL_BUTTON_LEFT)
+					{			    
+					    if (pointInRect(mouse, tileMap.getRect()))
+					    {
+						Vector2 tilePos =
+						    convertScreenPosToTilePos(&tileMap, mouse);
+
+						//TODO(denis): this is bugged?
+						Tile *clicked = tileMap.tiles + tilePos.x + tilePos.y*tileMap.widthInTiles;
+						clicked->sheetPos = selectedTile.pos;
+					    }
+					}
+				    }
+				    else if (currentTool == FILL_TOOL && tileMap.tiles)
+				    {
+					if (event.button.button == SDL_BUTTON_LEFT)
+					{
+					    if (pointInRect(mouse, tileMap.getRect()))
+					    {
+						Vector2 tilePos =
+						    convertScreenPosToTilePos(&tileMap, mouse);
+
+						startSelectPos = tileMap.offset + tilePos*tileMap.tileSize;
+					
+						selectionBox.pos.x = startSelectPos.x;
+						selectionBox.pos.y = startSelectPos.y;
+						selectionBox.pos.w = tileMap.tileSize;
+						selectionBox.pos.h = tileMap.tileSize;
+					    }
+					    else
+					    {
+						startSelectPos = {0, 0};
+					    }
+					}
 				    }
 				}
 			    }
+			    
+			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
+			    
+			    topMenuBar.onMouseDown(mouse, event.button.button);
+			    
 			} break;
 			
 			case SDL_MOUSEBUTTONUP:
@@ -569,10 +576,6 @@ int main(int argc, char* argv[])
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
 			    
-			    //TODO(denis): have a heirarchy of parts that detect mouse
-			    // clicks, if one ui element responds to a click, the
-			    // rest of the ui elements should be ignored
-
 			    if (importTileSetPanel.visible)
 			    {
 				ui_processMouseUp(&importTileSetPanel, mouse, mouseButton);
@@ -585,12 +588,16 @@ int main(int argc, char* argv[])
 				}
 				else if (ui_wasClicked(openButton, mouse))
 				{
-				    //TODO(denis): tile size should be fixed to the
-				    // size of the tile map tile size
-				    // if a tile map has been created
-				    int tileSize =
-					convertStringToInt(tileSizeEditText.text,
-							   tileSizeEditText.letterCount);
+				    int tileSize;
+				    if (tileMap.tileSize != 0)
+				    {
+					tileSize = tileMap.tileSize;
+				    }
+				    else
+				    {
+					tileSize = convertStringToInt(tileSizeEditText.text,
+								      tileSizeEditText.letterCount);
+				    }
 
 				    char *warning = "";
 				    if (tileSize == 0)
@@ -668,10 +675,12 @@ int main(int argc, char* argv[])
 					    
 					    importTileSetPanel.visible = false;
 
-					    //TODO(denis): do this if a tile map hasn't
-					    // been made
-					    selectionBox = createFilledTexturedRect(
-						renderer, tileSize, tileSize, 0x77FFFFFF);
+					    if (selectionBox.pos.w == 0 && selectionBox.pos.h == 0)
+					    {
+						initializeSelectionBox(renderer,
+								       &selectionBox,
+								       tileSize);
+					    }
 					}
 					else
 					{
@@ -700,87 +709,141 @@ int main(int argc, char* argv[])
 				    HeapFree(GetProcessHeap(), 0, fileName);
 				}
 			    }
+			    else if (newTileMapPanelVisible())
+			    {
+				newTileMapPanelRespondToMouseUp(mouse, mouseButton);
+			    }
 			    else if (topMenuBar.onMouseUp(mouse, event.button.button))
 			    {
 				if (pointInRect(mouse, topMenuBar.menus[0].getRect()))
 				{
 				    //NOTE(denis): clicked on the file menu
 				    int selectionY = (mouse.y - topMenuBar.menus[0].getRect().y)/topMenuBar.menus[0].items[0].pos.h;
-				    if (selectionY == 3)
+				    if (selectionY == 1)
 				    {
-					//NOTE(denis): 3 = "import tile sheet"
+					//NOTE(denis): 1 == "create new tile map"
+					newTileMapPanelSetVisible(true);
+					topMenuBar.menus[0].isOpen = false;
+				    }
+				    else if (selectionY == 4)
+				    {
+					//NOTE(denis): 4 = "import tile sheet"
 					importTileSetPanel.visible = true;
 					topMenuBar.menus[0].isOpen = false;
 				    }
 				}
 			    }
-			    else if (newTileMapPanelVisible())
+			    else if (tileSetPanel.visible || tileMapPanel.visible)
 			    {
-				newTileMapPanelRespondToMouseUp(mouse, mouseButton);
-			    }
-
-			    if (tileSetPanel.visible)
-			    {
-				if (tileSetDropDown.isOpen)
+				if (tileSetPanel.visible)
 				{
-				    if (pointInRect(mouse, tileSetDropDown.getRect()))
+				    if (tileSetDropDown.isOpen)
 				    {
-					int selection = (mouse.y - tileSetDropDown.getRect().y)/tileSetDropDown.items[0].pos.h;
-					if (selection == tileSetDropDown.itemCount-1)
+					if (pointInRect(mouse, tileSetDropDown.getRect()))
 					{
-					    importTileSetPanel.visible = true;
-					}
-					else
-					{
-					    SWAP_DATA(tileSets[selection], tileSets[0], TileSet);
+					    int selection = (mouse.y - tileSetDropDown.getRect().y)/tileSetDropDown.items[0].pos.h;
+					    if (selection == tileSetDropDown.itemCount-1)
+					    {
+						importTileSetPanel.visible = true;
+					    }
+					    else
+					    {
+						SWAP_DATA(tileSets[selection], tileSets[0], TileSet);
 
-					    tileSetDropDown.items[selection].setPosition(tileSetDropDown.items[0].getPosition());
-					    SWAP_DATA(tileSetDropDown.items[selection],
-						     tileSetDropDown.items[0],
-						     TextBox);
+						tileSetDropDown.items[selection].setPosition(tileSetDropDown.items[0].getPosition());
+						SWAP_DATA(tileSetDropDown.items[selection],
+							  tileSetDropDown.items[0],
+							  TextBox);
 
-					    selectedTile.sheetPos.x = 0;
-					    selectedTile.sheetPos.y = 0;
+						selectedTile.sheetPos.x = 0;
+						selectedTile.sheetPos.y = 0;
+					    }
 					}
+
+					tileSetDropDown.highlightedItem = -1;
+					tileSetDropDown.isOpen = false;
 				    }
-
-				    tileSetDropDown.highlightedItem = -1;
-				    tileSetDropDown.isOpen = false;
-				}
-				else if (pointInRect(mouse, tileSetDropDown.getRect())
-					 && tileSetDropDown.startedClick)
-				{
-				    tileSetDropDown.isOpen = true;
-				    tileSetDropDown.highlightedItem = 0;
-				}
-				else if (selectionVisible)
-				{
-				    selectedTile.sheetPos = tempSelectedTile;
-				}
-				
-			    }
+				    else if (pointInRect(mouse, tileSetDropDown.getRect())
+					     && tileSetDropDown.startedClick)
+				    {
+					tileSetDropDown.isOpen = true;
+					tileSetDropDown.highlightedItem = 0;
+				    }
+				    else if (selectionVisible)
+				    {
+					selectedTile.sheetPos = tempSelectedTile;
+				    }
+				}				
 			    
-			    //TODO(denis): temporary drop down menu test
-			    if (!menuOpen && tileMap.tiles && 
-				pointInRect(mouse, dropDown[selectedItem]->pos))
-			    {
-				menuOpen = true;
-			    }
-			    else if (menuOpen)
-			    {
-				menuOpen = false;
-				//TODO(denis): there are still bugs related to this
-				menuPause = 0;
-
-				for (int i = 0; i < menuLength; ++i)
+				//TODO(denis): have something like "!click used" or
+				// something
+				if (tileMapPanel.visible)
 				{
-				    if (pointInRect(mouse, dropDown[i]->pos))
+				    //TODO(denis): implement a proper "radio button" type
+				    // situation
+				    if (ui_wasClicked(paintToolIcon, mouse))
 				    {
-					selectedItem = i;
+					currentTool = PAINT_TOOL;
+					paintToolIcon.startedClick = false;
+				    }
+				    else if (ui_wasClicked(fillToolIcon, mouse))
+				    {
+					currentTool = FILL_TOOL;
+					fillToolIcon.startedClick = false;
+				    }
+				    else if (ui_wasClicked(createNewTileMapButton, mouse))
+				    {
+					newTileMapPanelSetVisible(true);
+					createNewTileMapButton.startedClick = false;
+				    }
+
+				    //NOTE(denis): tool behaviour
+				    if (tileMap.tiles)
+				    {
+					if (currentTool == FILL_TOOL)
+					{
+					    if (selectionVisible &&
+						startSelectPos != Vector2{0,0})
+					    {
+						Vector2 topLeft = {selectionBox.pos.x,
+								   selectionBox.pos.y};
+				    
+						Vector2 botRight = {selectionBox.pos.x+selectionBox.pos.w,
+								    selectionBox.pos.y+selectionBox.pos.h};
+				    
+						Vector2 startTile =
+						    convertScreenPosToTilePos(&tileMap, topLeft);
+						Vector2 endTile =
+						    convertScreenPosToTilePos(&tileMap, botRight);
+
+						if (endTile.x > tileMap.widthInTiles)
+						{
+						    endTile.x = tileMap.widthInTiles;
+						}
+						if (endTile.y > tileMap.heightInTiles)
+						{
+						    endTile.y = tileMap.heightInTiles;
+						}
+				    
+						for (int i = startTile.y; i < endTile.y; ++i)
+						{
+						    for (int j = startTile.x; j < endTile.x; ++j)
+						    {
+							(tileMap.tiles + i*tileMap.widthInTiles + j)->sheetPos = selectedTile.pos;
+						    }
+						}
+					    }
+					    selectionVisible =
+						moveSelectionInRect(&selectionBox, mouse, tileMap.getRect(),
+								    tileMap.tileSize);
+
+					    selectionBox.pos.w = tileMap.tileSize;
+					    selectionBox.pos.h = tileMap.tileSize;
+					}
 				    }
 				}
-			    }
-
+			    }			
+#if 0			    
 			    //NOTE(denis): hit the save button
 			    if (tileMap.tiles && saveButton.startedClick)
 			    {
@@ -788,69 +851,7 @@ int main(int argc, char* argv[])
 				
 				saveButton.startedClick = false;
 			    }
-			    
-			    //NOTE(denis): changing between the tools
-			    if (tileMap.tiles)
-			    {
-				//TODO(denis): implement a proper "radio button" type
-				// situation
-				if (ui_wasClicked(paintToolIcon, mouse))
-				{
-				    currentTool = PAINT_TOOL;
-				    paintToolIcon.startedClick = false;
-				}
-				else if (ui_wasClicked(fillToolIcon, mouse))
-				{
-				    currentTool = FILL_TOOL;
-				    fillToolIcon.startedClick = false;
-				}
-			    }
-
-			    //NOTE(denis): tool behaviour
-			    if (tileMap.tiles && menuPause > 15)
-			    {
-				if (currentTool == FILL_TOOL)
-				{
-				    if (selectionVisible &&
-					startSelectPos != Vector2{0,0})
-				    {
-					Vector2 topLeft = {selectionBox.pos.x,
-							selectionBox.pos.y};
-				    
-					Vector2 botRight = {selectionBox.pos.x+selectionBox.pos.w,
-							 selectionBox.pos.y+selectionBox.pos.h};
-				    
-					Vector2 startTile =
-					    convertScreenPosToTilePos(&tileMap, topLeft);
-					Vector2 endTile =
-					    convertScreenPosToTilePos(&tileMap, botRight);
-
-					if (endTile.x > tileMap.widthInTiles)
-					{
-					    endTile.x = tileMap.widthInTiles;
-					}
-					if (endTile.y > tileMap.heightInTiles)
-					{
-					    endTile.y = tileMap.heightInTiles;
-					}
-				    
-					for (int i = startTile.y; i < endTile.y; ++i)
-					{
-					    for (int j = startTile.x; j < endTile.x; ++j)
-					    {
-						(tileMap.tiles + i*tileMap.widthInTiles + j)->sheetPos = selectedTile.pos;
-					    }
-					}
-				    }
-#if 0
-				    selectionVisible = moveSelectionBox(&selectionBox, mouse,
-									&tileMap, &currentTileSet.background);
-
-				    selectionBox.pos.w = tileMap.tileSize;
-				    selectionBox.pos.h = tileMap.tileSize;
-#endif				    
-				}
-			    }
+#endif
 			} break;
 
 			case SDL_TEXTINPUT:
@@ -858,11 +859,14 @@ int main(int argc, char* argv[])
 			    char* theText = event.text.text;
 
 			    if (newTileMapPanelVisible())
+			    {
 				newTileMapPanelCharInput(theText[0]);
+			    }
 			    else if(importTileSetPanel.visible)
 			    {
 				ui_processLetterTyped(theText[0], &importTileSetPanel);
 			    }
+			    
 			} break;
 
 			case SDL_KEYDOWN:
@@ -870,12 +874,15 @@ int main(int argc, char* argv[])
 			    if (event.key.keysym.sym == SDLK_BACKSPACE)
 			    {
 				if (newTileMapPanelVisible())
+				{
 				    newTileMapPanelCharDeleted();
+				}
 				else if (importTileSetPanel.visible)
 				{
 				    ui_eraseLetter(&importTileSetPanel);
 				}   
 			    }
+			    
 			} break;
 
 			case SDL_KEYUP:
@@ -905,37 +912,62 @@ int main(int argc, char* argv[])
 
 		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
 		SDL_RenderClear(renderer);
-		
-		newTileMapPanelDraw();
-		
-		ui_draw(&saveButton);
+
+		if (tileMapPanel.visible)
+		{
+		    ui_draw(&tileMapPanel);
+
+		    if (!tileMap.tiles)
+		    {
+			ui_draw(&createNewTileMapButton);
+		    }
+		    else
+		    {
+			if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
+			{   
+			    TexturedRect defaultTile = createFilledTexturedRect(renderer, tileMap.tileSize, tileMap.tileSize, 0xFFAAAA00);
+			    Tile *row = tileMap.tiles;
+			    for (int i = 0; i < tileMap.heightInTiles; ++i)
+			    {
+				Tile *element = row;
+				for (int j = 0; j < tileMap.widthInTiles; ++j)
+				{
+				    if (element->sheetPos.w == 0 && element->sheetPos.h == 0)
+				    {
+					SDL_RenderCopy(renderer, defaultTile.image, NULL, &element->pos);
+				    }
+				    else
+					SDL_RenderCopy(renderer, tileSets[0].image, &element->sheetPos, &element->pos);
+				    ++element;
+				}
+
+				row += tileMap.widthInTiles;
+			    }
+
+			    SDL_DestroyTexture(defaultTile.image);
+			}	
+		    }
+		}
 
 		if (newTileMapPanelVisible())
 		{
+		    //TODO(denis): if the new tile map panel "tile size" field
+		    // doesn't have anything in it, make the default the same as the
+		    // current tile set's tile size
+		    
 		    if (newTileMapPanelDataReady())
 		    {
-			  int windowHeight = 0;
-			  int windowWidth = 0;
-			  SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+			int x = tileMapPanel.panel.pos.x + 15;
+			int y = tileMapPanel.panel.pos.y + 15;
+			tileMap = createNewTileMap(x, y);
 
-			  reorientEditingArea(windowWidth, windowHeight, &tileMap,
-			  &menuX, &menuY);
-			  
-			tileMap = createNewTileMap(50, 100);
-			
-			//TODO(denis): this should only be done once
-			// preferably at the beginning
-			int textBoxWidth = tileMap.widthInTiles*tileMap.tileSize - 20;
-			item1 = ui_createTextBox("first tile map", textBoxWidth, 35, COLOUR_BLACK,
-						 0xFFFFFFFF);
-			item2 = ui_createTextBox("second tile map", textBoxWidth, 35, COLOUR_BLACK,
-						 0xFFFFFFFF);
-			item3 = ui_createTextBox("third tile map", textBoxWidth, 35, COLOUR_BLACK,
-						 0xFFFFFFFF);
-			item1.setPosition({menuX, menuY});
+			newTileMapPanelSetVisible(false);
 
-			saveButton = ui_createTextButton("Save", COLOUR_WHITE,
-							 100, 50, 0xFF33AA88);
+			if (selectionBox.pos.w == 0 && selectionBox.pos.h == 0)
+			{
+			    initializeSelectionBox(renderer,
+						   &selectionBox, tileMap.tileSize);
+			}
 		    }
 		}
 		
@@ -1006,68 +1038,17 @@ int main(int argc, char* argv[])
 		    ui_draw(&tileSetDropDown);
 		}
 
-		SDL_RenderCopy(renderer, paintToolIcon.background.image, NULL, &paintToolIcon.background.pos);
-		SDL_RenderCopy(renderer, fillToolIcon.background.image, NULL, &fillToolIcon.background.pos);
-		
-		if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
-		{   
-		    TexturedRect defaultTile = createFilledTexturedRect(renderer, tileMap.tileSize, tileMap.tileSize, 0xFFAAAA00);
-		    Tile *row = tileMap.tiles;
-		    for (int i = 0; i < tileMap.heightInTiles; ++i)
-		    {
-			Tile *element = row;
-			for (int j = 0; j < tileMap.widthInTiles; ++j)
-			{
-			    if (element->sheetPos.w == 0 && element->sheetPos.h == 0)
-			    {
-				SDL_RenderCopy(renderer, defaultTile.image, NULL, &element->pos);
-			    }
-#if 0
-			    else
-				SDL_RenderCopy(renderer, tileSet[0].background.image, &element->sheetPos, &element->pos);
-#endif				
-			    ++element;
-			}
-
-			row += tileMap.widthInTiles;
-		    }
-
-		    SDL_DestroyTexture(defaultTile.image);
-
-		    //TODO(denis): testing drop down menu
-		    ++menuPause;
-		    if (menuOpen)
-		    {
-			dropDown[selectedItem]->setPosition({menuX, menuY});
-		    
-			int menuPos = 1;
-			ui_draw(dropDown[selectedItem]);
-		    
-			for (int i = 0; i < menuLength; ++i)
-			{
-			    if (i != selectedItem)
-			    {
-				int x = dropDown[selectedItem]->pos.x;
-				int y = dropDown[selectedItem]->pos.y + dropDown[selectedItem]->pos.h*menuPos;
-				dropDown[i]->setPosition({x, y});
-				ui_draw(dropDown[i]);
-				++menuPos;
-			    }
-			}
-		    }
-		    else
-		    {
-			dropDown[selectedItem]->setPosition({menuX, menuY});
-			ui_draw(dropDown[selectedItem]);
-		    }
-		}
-
 		if (selectionVisible)
 		    SDL_RenderCopy(renderer, selectionBox.image, NULL, &selectionBox.pos);
+
+		newTileMapPanelDraw();
+
+		//TODO(denis): if there is a created tile map, have the tile size
+		// field default with that value if it doesn't already have something
+		// in it
+		ui_draw(&importTileSetPanel);
 		
 		ui_draw(&topMenuBar);
-
-		ui_draw(&importTileSetPanel);
 		
 		SDL_RenderPresent(renderer);
 	    }

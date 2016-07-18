@@ -22,10 +22,12 @@ struct TileMap
     int tileSize;
     int widthInTiles;
     int heightInTiles;
-
-    //TODO(denis): should this be in here?
+    
     Vector2 offset;
 
+    //TODO(denis): create a setPosition function that will reposition all of the
+    // tiles contained within as well
+    
     SDL_Rect getRect()
     {
 	SDL_Rect result = {};
