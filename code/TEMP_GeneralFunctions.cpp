@@ -42,7 +42,7 @@ static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
     return result;
 }
 
-static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
+static inline TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
 {
     TexturedRect result = {};
     
@@ -54,7 +54,7 @@ static TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
     return result;
 }
 
-static SDL_Color hexColourToRGBA(uint32 hex)
+static inline SDL_Color hexColourToRGBA(uint32 hex)
 {
     SDL_Color result = {};
 
@@ -65,4 +65,35 @@ static SDL_Color hexColourToRGBA(uint32 hex)
     result.a = hex >> 24;
 
     return result;
+}
+
+//TODO(denis): dunno if these belong here
+static void initializeSelectionBox(SDL_Renderer *renderer,
+				   TexturedRect *selectionBox, uint32 tileSize)
+{
+    *selectionBox = createFilledTexturedRect(renderer, tileSize, tileSize, 0x77FFFFFF);
+}
+
+static bool moveSelectionInRect(TexturedRect *selectionBox, Vector2 mousePos,
+				SDL_Rect rect, uint32 tileSize)
+{
+    bool shouldBeDrawn = true;
+    
+    if (selectionBox->image != NULL)
+    {
+	if (pointInRect(mousePos, rect))
+	{
+	    Vector2 offset = {rect.x, rect.y};
+	    Vector2 newPos = ((mousePos - offset)/tileSize) * tileSize + offset;
+	    
+	    selectionBox->pos.x = newPos.x;
+	    selectionBox->pos.y = newPos.y;
+	    selectionBox->pos.h = tileSize;
+	    selectionBox->pos.w = tileSize;
+	}
+	else
+	    shouldBeDrawn = false;
+    }
+
+    return shouldBeDrawn;    
 }

@@ -228,12 +228,12 @@ int newTileMapPanelGetHeight()
     return _panel.panel.pos.h;
 }
 
-void newTileMapPanelRespondToMouseDown(Vector2 mousePos, uint8 mouseButton)
+void newTileMapPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton)
 {
     ui_processMouseDown(&_panel, mousePos, mouseButton);
 }
 
-void newTileMapPanelRespondToMouseUp(Vector2 mousePos, uint8 mouseButton)
+void newTileMapPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 {
     ui_processMouseUp(&_panel, mousePos, mouseButton);
 

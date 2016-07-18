@@ -41,6 +41,19 @@ struct TileMap
     }
 };
 
+struct TileSet
+{
+    char *name;
+
+    //TODO(denis): should this just be a width + height property?
+    SDL_Rect imageSize;
+    
+    SDL_Texture *image;
+    uint32 tileSize;
+
+    SDL_Rect collisionBox;
+};
+
 //TODO(denis): not sure where to put this
 struct TexturedRect
 {

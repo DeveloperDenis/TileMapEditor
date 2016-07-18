@@ -15,8 +15,8 @@ void newTileMapPanelSetPosition(Vector2 newPos);
 int newTileMapPanelGetWidth();
 int newTileMapPanelGetHeight();
 
-void newTileMapPanelRespondToMouseDown(Vector2 mousePos, uint8 mouseButton);
-void newTileMapPanelRespondToMouseUp(Vector2 mousePos, uint8 mouseButton);
+void newTileMapPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton);
+void newTileMapPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton);
 
 void newTileMapPanelSelectNext();
 void newTileMapPanelSelectPrevious();

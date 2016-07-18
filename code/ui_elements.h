@@ -86,6 +86,7 @@ struct DropDownMenu
     
     void addItem(char *newText, int position);
     void changeItem(char *newText, int position);
+    uint32 getItemAt(Vector2 pos);
 };
 
 struct MenuBar

@@ -186,6 +186,16 @@ void DropDownMenu::changeItem(char *newText, int position)
     }
 }
 
+uint32 DropDownMenu::getItemAt(Vector2 pos)
+{
+    uint32 result = 0;
+
+    if (pos.x >= this->getRect().x && pos.x <= this->getRect().x + this->getWidth())
+	result = (pos.y - this->getRect().y)/this->items[0].pos.h;
+
+    return result;
+}
+
 void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
 {
     int height = this->botRight.y - this->topLeft.y;
