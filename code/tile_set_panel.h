@@ -21,4 +21,7 @@ bool tileSetPanelImportTileSetPressed();
 
 bool tileSetPanelVisible();
 
+Vector2 tileSetPanelGetPosition();
+void tileSetPanelSetPosition(Vector2 newPos);
+
 #endif

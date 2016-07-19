@@ -25,6 +25,8 @@ static bool _selectionVisible;
 
 static bool _importTileSetPressed;
 
+static bool _startedClick;
+
 //TODO(denis): do I even need this?
 static SDL_Rect _tempSelectedTile;
 
@@ -48,25 +50,12 @@ void tileSetPanelCreateNew(SDL_Renderer *renderer,
 	_tileSetDropDown =
 	    ui_createDropDownMenu(items, num, width, height, COLOUR_BLACK,
 				  backgroundColour);
-
-	Vector2 newPos = {_panel.panel.pos.x + PADDING,
-			  _panel.panel.pos.y + PADDING};
-	_tileSetDropDown.setPosition(newPos);
     }
     ui_addToPanel(&_tileSetDropDown, &_panel);
 
-    {
-	int x = _tileSetDropDown.getRect().x;
-	
-	_selectedTileText =
-	    ui_createTextField("Selected Tile:", x, 0, COLOUR_BLACK);
-	int y = _panel.panel.pos.y + _panel.getHeight() -
-	    _selectedTileText.pos.h - PADDING;
-	_selectedTileText.pos.y = y;
-    }
+    _selectedTileText = ui_createTextField("Selected Tile:", 0, 0, COLOUR_BLACK);
 
-    _selectedTile.pos.x = _selectedTileText.pos.x + _selectedTileText.pos.w + PADDING;
-    _selectedTile.pos.y = _selectedTileText.pos.y;
+    tileSetPanelSetPosition({_panel.panel.pos.x, _panel.panel.pos.y});
 }
 
 void tileSetPanelDraw()
@@ -170,7 +159,11 @@ void tileSetPanelOnMouseMove(Vector2 mousePos)
 void tileSetPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton)
 {
     if (mouseButton == SDL_BUTTON_LEFT)
+    {
 	_tileSetDropDown.startedClick = pointInRect(mousePos, _tileSetDropDown.getRect());
+
+	_startedClick = pointInRect(mousePos, _tileSets[0].collisionBox);
+    }
 }
 
 void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
@@ -209,7 +202,7 @@ void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 	_tileSetDropDown.isOpen = true;
 	_tileSetDropDown.highlightedItem = 0;
     }
-    else if (_selectionVisible && mouseButton == SDL_BUTTON_LEFT)
+    else if (_selectionVisible && _startedClick && mouseButton == SDL_BUTTON_LEFT)
     {
 	//TODO(denis): does this need to be like this?
 	_selectedTile.sheetPos = _tempSelectedTile;
@@ -284,4 +277,30 @@ bool tileSetPanelImportTileSetPressed()
 bool tileSetPanelVisible()
 {
     return _panel.visible;
+}
+
+Vector2 tileSetPanelGetPosition()
+{
+    return Vector2{_panel.panel.pos.x, _panel.panel.pos.y};
+}
+
+void tileSetPanelSetPosition(Vector2 newPos)
+{
+    _panel.panel.pos.x = newPos.x;
+    _panel.panel.pos.y = newPos.y;
+
+    _tileSetDropDown.setPosition({_panel.panel.pos.x + PADDING,
+		_panel.panel.pos.y + PADDING});
+
+    {
+	int x = _tileSetDropDown.getRect().x;
+	int y = _panel.panel.pos.y + _panel.getHeight() -
+	    _selectedTileText.pos.h - PADDING;
+
+	_selectedTileText.pos.y = y;
+	_selectedTileText.pos.x = x;
+    }
+
+    _selectedTile.pos.x = _selectedTileText.pos.x + _selectedTileText.pos.w + PADDING;
+    _selectedTile.pos.y = _selectedTileText.pos.y;
 }

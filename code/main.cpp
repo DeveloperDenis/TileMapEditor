@@ -43,13 +43,14 @@
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
 {
     Vector2 result = {};
-
+    
     result = (pos - tileMap->offset)/tileMap->tileSize;
-     
+    
     return result;
 }
 
-static TileMap createNewTileMap(int startX, int startY)
+static TileMap createNewTileMap(int startX, int startY,
+				int32 *outWidth, int32 *outHeight)
 {
     TileMap newTileMap = {};
     newTileMap.offset.x = startX;
@@ -60,7 +61,10 @@ static TileMap createNewTileMap(int startX, int startY)
     newTileMap.widthInTiles = data->widthInTiles;
     newTileMap.heightInTiles = data->heightInTiles;
     newTileMap.tileSize = data->tileSize;
-				    
+
+    *outWidth = newTileMap.widthInTiles*newTileMap.tileSize;
+    *outHeight = newTileMap.heightInTiles*newTileMap.tileSize;
+    
     int memorySize = sizeof(Tile)*newTileMap.widthInTiles*newTileMap.heightInTiles;
     
     HANDLE heapHandle = GetProcessHeap();
@@ -224,6 +228,8 @@ int main(int argc, char* argv[])
 		tileSetPanelCreateNew(renderer, x, y, width, height);
 	    }
 	    //NOTE(denis): tile map panel
+	    SDL_Rect tileMapArea = {};
+	    
 	    UIPanel tileMapPanel = {};
 	    {
 		int x = 15;
@@ -232,6 +238,10 @@ int main(int argc, char* argv[])
 		int height = WINDOW_HEIGHT - y - 15;
 		uint32 colour = 0xFFEE2288;
 	        tileMapPanel = ui_createPanel(x, y, width, height, colour);
+
+		tileMapArea.x = x + 15;
+		tileMapArea.y = y + 15;
+		tileMapArea.h = height - 30;
 	    }
 
 	    Button createNewTileMapButton =
@@ -260,10 +270,16 @@ int main(int argc, char* argv[])
 		int y = tileMapPanel.panel.pos.y + 15;
 		paintToolIcon.setPosition({x, y});
 		fillToolIcon.setPosition({x, y+paintToolIcon.getHeight() + 5});
+
+		tileMapArea.w = x - tileMapArea.x - 15;
 	    }
 	    ui_addToPanel(&paintToolIcon, &tileMapPanel);
 	    ui_addToPanel(&fillToolIcon, &tileMapPanel);
-	    
+
+	    //TODO(denis): temp colour square
+	    TexturedRect colourSquare =
+		createFilledTexturedRect(renderer, tileMapArea.w,
+					 tileMapArea.h, 0xFFDDDDDD);
 	    
 	    while (running)
 	    {
@@ -749,10 +765,77 @@ int main(int argc, char* argv[])
 		    
 		    if (newTileMapPanelDataReady())
 		    {
-			int x = tileMapPanel.panel.pos.x + 15;
-			int y = tileMapPanel.panel.pos.y + 15;
-			tileMap = createNewTileMap(x, y);
+			int32 x = tileMapArea.x;
+			int32 y = tileMapArea.y;
+			int32 tileMapWidth = 0;
+			int32 tileMapHeight = 0;
+			
+			tileMap = createNewTileMap(x, y,
+						   &tileMapWidth, &tileMapHeight);
 
+			int32 width = MAX(tileMapWidth, tileMapArea.w);
+			int32 height = MAX(tileMapHeight, tileMapArea.h);
+			
+			colourSquare =
+			    createFilledTexturedRect(renderer, width,
+						     height, 0xFFDDDDDD);
+			
+
+			if (width >= tileMapPanel.panel.pos.w ||
+			    height >= tileMapPanel.panel.pos.h)
+			{
+			    int windowHeight = 0;
+			    int windowWidth = 0;
+			    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+			    
+			    Vector2 windowDelta = {width - tileMapArea.w,
+						   height - tileMapArea.h};
+			    
+			    if (windowDelta.x > 0)
+			    {
+				windowWidth += windowDelta.x;
+			    }
+			    else
+				windowDelta.x = 0;
+			    
+			    if (windowDelta.y > 0)
+			    {
+				windowHeight += windowDelta.y;
+			    }
+			    else
+				windowDelta.y = 0;
+
+			    //NOTE(denis): don't make a window bigger than the user's screen
+			    SDL_Rect screenSize = {};
+			    SDL_GetDisplayBounds(0, &screenSize);
+
+				//TODO(denis): might want to make this cap at 
+				// screenSize.h - 100 and screenSize.w - 100
+			    if (windowWidth > screenSize.w)
+				windowWidth = screenSize.w;
+			    if (windowHeight > screenSize.h)
+				windowHeight = screenSize.h;
+			    
+			    SDL_SetWindowSize(window, windowWidth, windowHeight);
+
+			    //TODO(denis): if the tile map created is bigger than the
+			    // user's screen, the tile map should appear in a smaller
+			    // area that is scrollable
+			    // so that the whole editing area is still visible
+			    
+			    tileMapPanel.panel.pos.w += windowDelta.x;
+			    tileMapPanel.panel.pos.h += windowDelta.y;
+
+			    paintToolIcon.setPosition({paintToolIcon.background.pos.x + windowDelta.x,
+					paintToolIcon.background.pos.y + windowDelta.y});
+			    fillToolIcon.setPosition({fillToolIcon.background.pos.x + windowDelta.x,
+					fillToolIcon.background.pos.y + windowDelta.y});
+
+			    topMenuBar.botRight.x += windowDelta.x;
+
+			    tileSetPanelSetPosition(tileSetPanelGetPosition()+windowDelta);
+			}
+			
 			newTileMapPanelSetVisible(false);
 
 			if (selectionBox.pos.w == 0 && selectionBox.pos.h == 0)
@@ -772,6 +855,8 @@ int main(int argc, char* argv[])
 		{
 		    ui_draw(&tileMapPanel);
 
+		    SDL_RenderCopy(renderer, colourSquare.image, NULL, &tileMapArea);
+
 		    if (!tileMap.tiles)
 		    {
 			ui_draw(&createNewTileMapButton);
@@ -779,8 +864,7 @@ int main(int argc, char* argv[])
 		    else
 		    {
 			if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
-			{   
-			    TexturedRect defaultTile = createFilledTexturedRect(renderer, tileMap.tileSize, tileMap.tileSize, 0xFFAAAA00);
+			{
 			    Tile *row = tileMap.tiles;
 			    for (int i = 0; i < tileMap.heightInTiles; ++i)
 			    {
@@ -789,7 +873,35 @@ int main(int argc, char* argv[])
 				{
 				    if (element->sheetPos.w == 0 && element->sheetPos.h == 0)
 				    {
-					SDL_RenderCopy(renderer, defaultTile.image, NULL, &element->pos);
+					SDL_Rect rects[2] = {};
+					rects[0] = element->pos;
+					rects[1] = {rects[0].x+1, rects[0].y+1,
+						    rects[0].w-2, rects[0].h-2};
+
+					if (j == 0)
+					{
+					    ++rects[1].x;
+					    --rects[1].w;
+					}
+					if (i == 0)
+					{
+					    ++rects[1].y;
+					    --rects[1].h;
+					}
+					if (j == tileMap.widthInTiles-1)
+					{
+					    --rects[1].w;
+					}
+					if (i == tileMap.heightInTiles-1)
+					{
+					    --rects[1].h;
+					}
+					    
+					SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+					SDL_RenderFillRect(renderer, &rects[0]);
+
+					SDL_SetRenderDrawColor(renderer, 180, 50, 0, 255);
+					SDL_RenderFillRect(renderer, &rects[1]);
 				    }
 				    else
 					SDL_RenderCopy(renderer, tileSetPanelGetCurrentTileSet(), &element->sheetPos, &element->pos);
@@ -798,8 +910,6 @@ int main(int argc, char* argv[])
 
 				row += tileMap.widthInTiles;
 			    }
-
-			    SDL_DestroyTexture(defaultTile.image);
 			}	
 		    }
 		}
