@@ -38,6 +38,7 @@
 #define TITLE "Tile Map Editor"
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
+#define BACKGROUND_COLOUR 60,67,69,255
 
 
 static Vector2 convertScreenPosToTilePos(TileMap *tileMap, Vector2 pos)
@@ -79,13 +80,14 @@ static TileMap createNewTileMap(int startX, int startY,
 	    for (int j = 0; j < newTileMap.widthInTiles; ++j)
 	    {
 		SDL_Rect rect;
-						
+		
 		rect.h = newTileMap.tileSize;
 		rect.w = newTileMap.tileSize;
 		rect.x = newTileMap.offset.x + j*newTileMap.tileSize;
 		rect.y = newTileMap.offset.y + i*newTileMap.tileSize;
 		
 		element->pos = rect;
+		element->sheetPos.w = element->sheetPos.h = newTileMap.tileSize;
 		
 		++element;
 	    }
@@ -123,6 +125,7 @@ int main(int argc, char* argv[])
 	    
 	    char *tileMapName = NULL;
 
+	    TexturedRect defaultTile = loadImage(renderer, "default_tile.png");
 	    TileMap tileMap = {};
 	    tileMap.offset = {5, 5};
 
@@ -134,7 +137,7 @@ int main(int argc, char* argv[])
 	    ui_setFont(menuFontName, menuFontSize);
 
 	    MenuBar topMenuBar = ui_createMenuBar(0, 0, WINDOW_WIDTH, 20,
-						  0xFFCCCCCC, 0xFF000000);
+						  0xFF667378, 0xFF000000);
 	    
 	    char *items[] = {"File", "Create New Tile Map", "Open Tile Map...",
 			     "Save Tile Map...", "Import Tile Sheet...", "Exit"};	     
@@ -229,6 +232,7 @@ int main(int argc, char* argv[])
 	    }
 	    //NOTE(denis): tile map panel
 	    SDL_Rect tileMapArea = {};
+	    SDL_Rect tileMapVisibleArea = {};
 	    
 	    UIPanel tileMapPanel = {};
 	    {
@@ -276,10 +280,12 @@ int main(int argc, char* argv[])
 	    ui_addToPanel(&paintToolIcon, &tileMapPanel);
 	    ui_addToPanel(&fillToolIcon, &tileMapPanel);
 
-	    //TODO(denis): temp colour square
-	    TexturedRect colourSquare =
-		createFilledTexturedRect(renderer, tileMapArea.w,
-					 tileMapArea.h, 0xFFDDDDDD);
+	    //TODO(denis): testing scroll bar
+	    TexturedRect backgroundBar = {};
+	    TexturedRect scrollingBar = {};
+	    int32 scrollClickDelta = 0;
+	    bool mouseDownScroll = false;
+	    Vector2 tileMapDrawPosOffset = {};
 	    
 	    while (running)
 	    {
@@ -333,14 +339,25 @@ int main(int argc, char* argv[])
 			    {
 				tileSetPanelOnMouseMove(mouse);
 			    }
-			    
-			    if (currentTool == PAINT_TOOL && tileMapPanel.visible &&
+
+			    if (mouseDownScroll)
+			    {
+				scrollingBar.pos.x = mouse.x - scrollClickDelta;
+				if (scrollingBar.pos.x < backgroundBar.pos.x)
+				    scrollingBar.pos.x = backgroundBar.pos.x;
+				else if (scrollingBar.pos.x > backgroundBar.pos.x + backgroundBar.pos.w - scrollingBar.pos.w)
+				    scrollingBar.pos.x = backgroundBar.pos.x + backgroundBar.pos.w - scrollingBar.pos.w;
+
+				real32 percentMoved = (real32)(scrollingBar.pos.x-backgroundBar.pos.x)/(real32)(backgroundBar.pos.w - scrollingBar.pos.w);
+				tileMapDrawPosOffset.x = (int32)((tileMap.widthInTiles*tileMap.tileSize - tileMapVisibleArea.w)*percentMoved);
+			    }
+			    else if (currentTool == PAINT_TOOL && tileMapPanel.visible &&
 				tileMap.tiles)
 			    {
 				if (selectionBox.pos.w != 0 && selectionBox.pos.h != 0)
 				{
 				    selectionVisible = moveSelectionInRect(&selectionBox, mouse,
-									   tileMap.getRect(), tileMap.tileSize);
+									   tileMapVisibleArea, tileMap.tileSize);
 				}
 				
 				if (event.motion.state & SDL_BUTTON_LMASK)
@@ -351,7 +368,12 @@ int main(int argc, char* argv[])
 					    (mouse - tileMap.offset)/tileMap.tileSize;
 
 					Tile *clicked = tileMap.tiles + tile.x + tile.y*tileMap.widthInTiles;
-					clicked->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+
+					if (tileSetPanelGetSelectedTile().sheetPos.w != 0 &&
+					    tileSetPanelGetSelectedTile().sheetPos.h != 0)
+					{
+					    clicked->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+					}
 				    }
 				}
 			    }
@@ -405,7 +427,7 @@ int main(int argc, char* argv[])
 				}
 				else
 				{
-				    selectionVisible = moveSelectionInRect(&selectionBox, mouse, tileMap.getRect(), tileMap.tileSize);
+				    selectionVisible = moveSelectionInRect(&selectionBox, mouse, tileMapVisibleArea, tileMap.tileSize);
 				}
 			    }
 			} break;
@@ -432,6 +454,12 @@ int main(int argc, char* argv[])
 
 				if (tileMapPanel.visible)
 				{
+				    if (pointInRect(mouse, scrollingBar.pos))
+				    {
+					mouseDownScroll = true;
+					scrollClickDelta = mouse.x - scrollingBar.pos.x;
+				    }
+				    
 				    ui_processMouseDown(&tileMapPanel, mouse, mouseButton);
 				    
 				    createNewTileMapButton.startedClick =
@@ -447,7 +475,12 @@ int main(int argc, char* argv[])
 						    convertScreenPosToTilePos(&tileMap, mouse);
 
 						Tile *clicked = tileMap.tiles + tilePos.x + tilePos.y*tileMap.widthInTiles;
-						clicked->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+
+						if (tileSetPanelGetSelectedTile().sheetPos.w != 0 &&
+						    tileSetPanelGetSelectedTile().sheetPos.h != 0)
+						{
+						    clicked->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+						}
 					    }
 					}
 				    }
@@ -486,6 +519,8 @@ int main(int argc, char* argv[])
 			{
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
+
+			    mouseDownScroll = false;
 			    
 			    if (importTileSetPanel.visible)
 			    {
@@ -591,6 +626,9 @@ int main(int argc, char* argv[])
 			    }
 			    else if (topMenuBar.onMouseUp(mouse, event.button.button))
 			    {
+				//TODO(denis): need better solution
+				tileSetPanelOnMouseUp({0,0}, mouseButton);
+				
 				if (pointInRect(mouse, topMenuBar.menus[0].getRect()))
 				{
 				    //NOTE(denis): clicked on the file menu
@@ -673,7 +711,10 @@ int main(int argc, char* argv[])
 						{
 						    for (int j = startTile.x; j < endTile.x; ++j)
 						    {
-							(tileMap.tiles + i*tileMap.widthInTiles + j)->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+							if (tileSetPanelGetSelectedTile().sheetPos.w != 0)
+							{
+							    (tileMap.tiles + i*tileMap.widthInTiles + j)->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+							}
 						    }
 						}
 					    }
@@ -754,7 +795,7 @@ int main(int argc, char* argv[])
 		    }
 		}
 
-		SDL_SetRenderDrawColor(renderer, 15, 65, 95, 255);
+		SDL_SetRenderDrawColor(renderer, BACKGROUND_COLOUR);
 		SDL_RenderClear(renderer);
 
 		if (newTileMapPanelVisible())
@@ -772,7 +813,41 @@ int main(int argc, char* argv[])
 			
 			tileMap = createNewTileMap(x, y,
 						   &tileMapWidth, &tileMapHeight);
+			
+			tileMapVisibleArea = tileMapArea;
+			tileMapVisibleArea.w = tileMapWidth;
+			tileMapVisibleArea.h = tileMapHeight;
+			
+			if (tileMapWidth > tileMapArea.w)
+			{
+			    int32 backgroundWidth = (tileMapArea.w/tileMap.tileSize)*tileMap.tileSize;
+			    tileMapVisibleArea.w = backgroundWidth;
+			    
+			    backgroundBar =
+				createFilledTexturedRect(renderer, backgroundWidth,
+							 25, 0xFFFFFFFF);
 
+			    real32 sizeRatio = (real32)tileMapArea.w/(real32)tileMapWidth;
+			    
+			    scrollingBar =
+				createFilledTexturedRect(renderer, (int32)(tileMapArea.w*sizeRatio),
+							 25, 0xFFAAAAAA);
+
+			    scrollingBar.pos.y = backgroundBar.pos.y = tileMap.offset.y + MIN(tileMapHeight, tileMapArea.h) + 2;
+			    scrollingBar.pos.x = backgroundBar.pos.x = tileMapArea.x;
+			}
+			if (tileMapHeight > tileMapArea.h)
+			{
+			    int32 backgroundHeight = (tileMapArea.h/tileMap.tileSize)*tileMap.tileSize;
+			    tileMapVisibleArea.h = backgroundHeight;
+
+			    //TODO(denis): set up vertical scroll bar
+			}
+#if 0
+			//TODO(denis): want to do all this kind of thing inside the
+			// resize event instead
+			// automatically resizing things is kinda jarring
+			
 			int32 width = MAX(tileMapWidth, tileMapArea.w);
 			int32 height = MAX(tileMapHeight, tileMapArea.h);
 			
@@ -809,12 +884,10 @@ int main(int argc, char* argv[])
 			    SDL_Rect screenSize = {};
 			    SDL_GetDisplayBounds(0, &screenSize);
 
-				//TODO(denis): might want to make this cap at 
-				// screenSize.h - 100 and screenSize.w - 100
-			    if (windowWidth > screenSize.w)
-				windowWidth = screenSize.w;
-			    if (windowHeight > screenSize.h)
-				windowHeight = screenSize.h;
+			    if (windowWidth > screenSize.w - 100)
+				windowWidth = screenSize.w - 100;
+			    if (windowHeight > screenSize.h - 100)
+				windowHeight = screenSize.h - 100;
 			    
 			    SDL_SetWindowSize(window, windowWidth, windowHeight);
 
@@ -835,6 +908,7 @@ int main(int argc, char* argv[])
 
 			    tileSetPanelSetPosition(tileSetPanelGetPosition()+windowDelta);
 			}
+#endif
 			
 			newTileMapPanelSetVisible(false);
 
@@ -855,8 +929,6 @@ int main(int argc, char* argv[])
 		{
 		    ui_draw(&tileMapPanel);
 
-		    SDL_RenderCopy(renderer, colourSquare.image, NULL, &tileMapArea);
-
 		    if (!tileMap.tiles)
 		    {
 			ui_draw(&createNewTileMapButton);
@@ -865,50 +937,67 @@ int main(int argc, char* argv[])
 		    {
 			if (tileMap.tiles && tileMap.widthInTiles != 0 && tileMap.heightInTiles != 0)
 			{
-			    Tile *row = tileMap.tiles;
-			    for (int i = 0; i < tileMap.heightInTiles; ++i)
+			    int32 startTileX = (tileMapDrawPosOffset.x)/tileMap.tileSize;
+			    int32 startTileY = (tileMapDrawPosOffset.y)/tileMap.tileSize;
+			    
+			    for (int32 i = startTileY; i < tileMap.heightInTiles; ++i)
 			    {
-				Tile *element = row;
-				for (int j = 0; j < tileMap.widthInTiles; ++j)
+				for (int32 j = startTileX; j < tileMap.widthInTiles; ++j)
 				{
-				    if (element->sheetPos.w == 0 && element->sheetPos.h == 0)
+				    Tile *element = tileMap.tiles + i*tileMap.widthInTiles + j;
+
+				    SDL_Texture *tileSet = tileSetPanelGetCurrentTileSet();
+				    
+				    if (!tileSet)
 				    {
-					SDL_Rect rects[2] = {};
-					rects[0] = element->pos;
-					rects[1] = {rects[0].x+1, rects[0].y+1,
-						    rects[0].w-2, rects[0].h-2};
+					tileSet = defaultTile.image;
+				    }
+				    
+				    SDL_Rect drawRectSheet = element->sheetPos;
+				    SDL_Rect drawRectScreen = element->pos;
 
-					if (j == 0)
-					{
-					    ++rects[1].x;
-					    --rects[1].w;
-					}
-					if (i == 0)
-					{
-					    ++rects[1].y;
-					    --rects[1].h;
-					}
-					if (j == tileMap.widthInTiles-1)
-					{
-					    --rects[1].w;
-					}
-					if (i == tileMap.heightInTiles-1)
-					{
-					    --rects[1].h;
-					}
-					    
-					SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-					SDL_RenderFillRect(renderer, &rects[0]);
+				    //TODO(denis): only worrying about horizontal scrolling
+				    // for now
 
-					SDL_SetRenderDrawColor(renderer, 180, 50, 0, 255);
-					SDL_RenderFillRect(renderer, &rects[1]);
+				    //TODO(denis): breaks with default tile
+				    // I think it's because i'm assuming the images
+				    // have the same size as the tile size
+				    if (drawRectScreen.x - tileMapDrawPosOffset.x
+					< tileMapVisibleArea.x)
+				    {
+					drawRectScreen.x = tileMapVisibleArea.x;
+					drawRectScreen.w -= tileMapDrawPosOffset.x % tileMap.tileSize;
+					drawRectSheet.w = drawRectScreen.w;
+					drawRectSheet.x += tileMapDrawPosOffset.x % tileMap.tileSize;
 				    }
 				    else
-					SDL_RenderCopy(renderer, tileSetPanelGetCurrentTileSet(), &element->sheetPos, &element->pos);
-				    ++element;
+				    {
+					drawRectScreen.x -= tileMapDrawPosOffset.x;
+					
+					if (drawRectScreen.x+drawRectScreen.w >
+					    tileMapVisibleArea.x+tileMapVisibleArea.w)
+					{
+					    drawRectSheet.w = tileMapDrawPosOffset.x % tileMap.tileSize;
+					    drawRectScreen.w = drawRectSheet.w;
+					}
+				    }
+				    
+				    drawRectScreen.h = drawRectSheet.h;
+				    
+				    //TODO(denis): first part of this is redundant
+				    // because of startTileX
+				    if (drawRectScreen.x+drawRectScreen.w >= tileMapVisibleArea.x
+					&& drawRectScreen.x <= tileMapVisibleArea.x+tileMapVisibleArea.w)
+				    {
+				        SDL_RenderCopy(renderer, tileSet, &drawRectSheet, &drawRectScreen);
+				    }
 				}
+			    }
 
-				row += tileMap.widthInTiles;
+			    if (backgroundBar.image != 0 && scrollingBar.image != 0)
+			    {
+				ui_draw(&backgroundBar);
+				ui_draw(&scrollingBar);
 			    }
 			}	
 		    }

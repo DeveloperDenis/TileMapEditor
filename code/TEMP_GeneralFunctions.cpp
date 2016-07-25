@@ -28,9 +28,9 @@ static TexturedRect createFilledTexturedRect(SDL_Renderer *renderer,
 
     uint32 rmask, gmask, bmask, amask;
     amask = 0xFF000000;
-    bmask = 0x00FF0000;
+    rmask = 0x00FF0000;
     gmask = 0x0000FF00;
-    rmask = 0x000000FF;
+    bmask = 0x000000FF;
     
     SDL_Surface *rectangle = SDL_CreateRGBSurface(0, width, height, 32,
 						  rmask, gmask, bmask, amask);

@@ -16,8 +16,12 @@ typedef int16_t int16;
 typedef int32_t int32;
 typedef int64_t int64;
 
+typedef float real32;
+typedef double real64;
+
 #define MAX(val1, val2) ((val1) > (val2) ? (val1) : (val2))
-#define SWAP_DATA(a, b, type)			\
+#define MIN(val1, val2) ((val1) < (val2) ? (val1) : (val2))
+#define SWAP_DATA(a, b, type)				\
     do {						\
      type temp = a;				\
      a = b;					\

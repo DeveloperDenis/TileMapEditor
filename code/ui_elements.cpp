@@ -775,14 +775,31 @@ Button ui_createImageButton(char *imageFileName)
     return result;
 }
 
-//TODO(denis): define some function/macro or something to simplify this colour nonsense
+//TODO(denis): probably smart to have the caller have control over the selection
+// colour
 DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
 				   int itemWidth, int itemHeight,
 				   uint32 textColour, uint32 backgroundColour)
 {
     DropDownMenu result = {};
-    //TODO(denis): don't hardcode selection colour
-    Uint32 selectionColour = 0xFF555555;
+
+    uint32 colourDelta = 0x00252525;
+    uint32 selectionColour;
+
+    if (backgroundColour == 0xFF000000)
+	selectionColour = colourDelta + 0xFF000000;
+    else
+    {
+	if (colourDelta - backgroundColour < colourDelta)
+	{
+	    selectionColour = 0xFF000000;
+	}
+	else
+	{
+	    selectionColour = backgroundColour - colourDelta;
+	}
+    }
+    
     result.highlightedItem = -1;
     result.selectionBox = createFilledTexturedRect(_renderer, itemWidth, itemHeight,
 						   selectionColour).image;
