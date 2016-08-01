@@ -87,7 +87,7 @@ static Vector2 convertScreenPosToTilePos(int32 tileSize, Vector2 tileMapOffset,
     {
         tileMapOffset.x += firstTileWidth;
 
-	if (screenPos.x > tileMapOffset.x)
+	if (screenPos.x >= tileMapOffset.x)
 	    ++tilePos.x;
     }
     tilePos.x += (screenPos.x - tileMapOffset.x)/tileSize;
@@ -97,7 +97,7 @@ static Vector2 convertScreenPosToTilePos(int32 tileSize, Vector2 tileMapOffset,
     {
 	tileMapOffset.y += firstTileHeight;
 
-	if (screenPos.y > tileMapOffset.y)
+	if (screenPos.y >= tileMapOffset.y)
 	    ++tilePos.y;
     }
     tilePos.y += (screenPos.y - tileMapOffset.y)/tileSize;
@@ -502,23 +502,16 @@ int main(int argc, char* argv[])
 			    else if (currentTool == FILL_TOOL && tileMapPanel.visible &&
 				     tileMap.tiles)
 			    {
-					//TODO(denis): selection is broken if the map is scrolled a bit and you start selecting from 
-					// the second tile and go up to the half tile above it.
 				if (event.motion.state & SDL_BUTTON_LMASK &&
 				    startSelectPos != Vector2{0,0})
 				{
 				    selectionVisible = true;
-				    
-				    if (mouse.x < tileMapVisibleArea.x)
-					int x = 0;
-				    if (mouse.y < tileMapVisibleArea.y)
-					int y = 0;
 
 				    Vector2 offset = {tileMapArea.x, tileMapArea.y};
 
 				    Vector2 tilePos =
 					convertScreenPosToTilePos(tileMap.tileSize, offset, tileMapDrawPosOffset, mouse);
-				    
+				    static int32 startY = tilePos.y;				    
 				    Vector2 startedTilePos =
 					convertScreenPosToTilePos(tileMap.tileSize, offset, tileMapDrawPosOffset, startSelectPos);
 
@@ -840,10 +833,14 @@ int main(int argc, char* argv[])
 					currentTool = FILL_TOOL;
 					fillToolIcon.startedClick = false;
 				    }
-				    else if (ui_wasClicked(createNewTileMapButton, mouse))
+
+				    if (!tileMap.tiles)
 				    {
-					newTileMapPanelSetVisible(true);
-					createNewTileMapButton.startedClick = false;
+					if (ui_wasClicked(createNewTileMapButton, mouse))
+					{
+					    newTileMapPanelSetVisible(true);
+					    createNewTileMapButton.startedClick = false;
+					}
 				    }
 
 				    //NOTE(denis): tool behaviour
@@ -854,17 +851,17 @@ int main(int argc, char* argv[])
 					    if (selectionVisible &&
 						startSelectPos != Vector2{0,0})
 					    {
-#if 0
 						Vector2 topLeft = {selectionBox.pos.x,
 								   selectionBox.pos.y};
 				    
-						Vector2 botRight = {selectionBox.pos.x+selectionBox.pos.w,
-								    selectionBox.pos.y+selectionBox.pos.h};
-				    
+						Vector2 botRight = {selectionBox.pos.x+selectionBox.pos.w-1,
+								    selectionBox.pos.y+selectionBox.pos.h-1};
+
+						Vector2 offset = {tileMapVisibleArea.x, tileMapVisibleArea.y};
 						Vector2 startTile =
-						    convertScreenPosToTilePos(&tileMap, topLeft);
+						    convertScreenPosToTilePos(tileMap.tileSize, offset, tileMapDrawPosOffset, topLeft);
 						Vector2 endTile =
-						    convertScreenPosToTilePos(&tileMap, botRight);
+						    convertScreenPosToTilePos(tileMap.tileSize, offset, tileMapDrawPosOffset, botRight);
 
 						if (endTile.x > tileMap.widthInTiles)
 						{
@@ -875,9 +872,9 @@ int main(int argc, char* argv[])
 						    endTile.y = tileMap.heightInTiles;
 						}
 				    
-						for (int i = startTile.y; i < endTile.y; ++i)
+						for (int i = startTile.y; i <= endTile.y; ++i)
 						{
-						    for (int j = startTile.x; j < endTile.x; ++j)
+						    for (int j = startTile.x; j <= endTile.x; ++j)
 						    {
 							if (tileSetPanelGetSelectedTile().sheetPos.w != 0)
 							{
@@ -885,7 +882,6 @@ int main(int argc, char* argv[])
 							}
 						    }
 						}
-#endif
 					    }
 
 					    selectionVisible = pointInRect(mouse, tileMapVisibleArea);
@@ -1023,72 +1019,6 @@ int main(int argc, char* argv[])
 			    scrollingBarY.pos.y = backgroundBarY.pos.y = tileMapArea.y;
 			    scrollingBarY.pos.x = backgroundBarY.pos.x = tileMap.offset.x + tileMapVisibleArea.w + 4;
 			}
-#if 0
-			//TODO(denis): want to do all this kind of thing inside the
-			// resize event instead
-			// automatically resizing things is kinda jarring
-			
-			int32 width = MAX(tileMapWidth, tileMapArea.w);
-			int32 height = MAX(tileMapHeight, tileMapArea.h);
-			
-			colourSquare =
-			    createFilledTexturedRect(renderer, width,
-						     height, 0xFFDDDDDD);
-			
-
-			if (width >= tileMapPanel.panel.pos.w ||
-			    height >= tileMapPanel.panel.pos.h)
-			{
-			    int windowHeight = 0;
-			    int windowWidth = 0;
-			    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
-			    
-			    Vector2 windowDelta = {width - tileMapArea.w,
-						   height - tileMapArea.h};
-			    
-			    if (windowDelta.x > 0)
-			    {
-				windowWidth += windowDelta.x;
-			    }
-			    else
-				windowDelta.x = 0;
-			    
-			    if (windowDelta.y > 0)
-			    {
-				windowHeight += windowDelta.y;
-			    }
-			    else
-				windowDelta.y = 0;
-
-			    //NOTE(denis): don't make a window bigger than the user's screen
-			    SDL_Rect screenSize = {};
-			    SDL_GetDisplayBounds(0, &screenSize);
-
-			    if (windowWidth > screenSize.w - 100)
-				windowWidth = screenSize.w - 100;
-			    if (windowHeight > screenSize.h - 100)
-				windowHeight = screenSize.h - 100;
-			    
-			    SDL_SetWindowSize(window, windowWidth, windowHeight);
-
-			    //TODO(denis): if the tile map created is bigger than the
-			    // user's screen, the tile map should appear in a smaller
-			    // area that is scrollable
-			    // so that the whole editing area is still visible
-			    
-			    tileMapPanel.panel.pos.w += windowDelta.x;
-			    tileMapPanel.panel.pos.h += windowDelta.y;
-
-			    paintToolIcon.setPosition({paintToolIcon.background.pos.x + windowDelta.x,
-					paintToolIcon.background.pos.y + windowDelta.y});
-			    fillToolIcon.setPosition({fillToolIcon.background.pos.x + windowDelta.x,
-					fillToolIcon.background.pos.y + windowDelta.y});
-
-			    topMenuBar.botRight.x += windowDelta.x;
-
-			    tileSetPanelSetPosition(tileSetPanelGetPosition()+windowDelta);
-			}
-#endif
 			
 			newTileMapPanelSetVisible(false);
 
