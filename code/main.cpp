@@ -1,8 +1,5 @@
 /* TODO(denis):
- * in the beginning, check the resolution of the user's monitor, and don't allow them
- * to make tile maps that would be too big!
- * SDL_GetDisplayUsableBounds
- * (support saving to different formats as well?)
+ * support saving to different formats?
  *
  * loading a tilemap
  * (again in different formats)
@@ -15,6 +12,8 @@
  * etc...
  *
  * DISABLE top menu bar when popup is visible
+ *
+ * add a keyboard shortcut to change to next tool and change to previous tool
  */
 
 //IMPORTANT(denis): note to self, design everything expecting at least a 1280 x 720
@@ -39,6 +38,43 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define BACKGROUND_COLOUR 60,67,69,255
+
+const enum ToolType
+{
+    PAINT_TOOL,
+    FILL_TOOL,
+    MOVE_TOOL
+};
+
+static void changeCurrentTool(ToolType *currentTool, ToolType newType,
+			      Button *paintToolIcon, Button *fillToolIcon,
+			      Button *moveToolIcon, TexturedRect *selectedToolIcon,
+			      bool *selectionVisible)
+{
+    if (newType == PAINT_TOOL)
+    {
+	selectedToolIcon->pos.x = paintToolIcon->background.pos.x;
+	selectedToolIcon->pos.y = paintToolIcon->background.pos.y;
+	paintToolIcon->startedClick = false;
+    }
+    else if (newType == FILL_TOOL)
+    {
+	selectedToolIcon->pos.x = fillToolIcon->background.pos.x;
+	selectedToolIcon->pos.y = fillToolIcon->background.pos.y;
+					
+	fillToolIcon->startedClick = false;
+    }
+    else if (newType == MOVE_TOOL)
+    {
+	selectedToolIcon->pos.x = moveToolIcon->background.pos.x;
+	selectedToolIcon->pos.y = moveToolIcon->background.pos.y;
+					
+	moveToolIcon->startedClick = false;
+	*selectionVisible = false;
+    }
+    
+    *currentTool = newType;
+}
 
 static inline void openImportTileSetPanel(UIPanel *importTileSetPanel,
 					  EditText *tileSizeEditText)
@@ -404,12 +440,7 @@ int main(int argc, char* argv[])
 	    
 	    Button saveButton = {};
 	    
-	    const enum ToolType
-	    {
-		PAINT_TOOL,
-		FILL_TOOL,
-		MOVE_TOOL
-	    };
+	    ToolType previousTool = PAINT_TOOL;
 	    ToolType currentTool = PAINT_TOOL;
 	    
 	    Button paintToolIcon = ui_createImageButton("paint-brush-icon-32.png");
@@ -487,7 +518,8 @@ int main(int argc, char* argv[])
 			{
 			    //TODO(denis): also handle when the user has focus on our
 			    // window but has moved off of it
-
+			    SDL_SetCursor(arrowCursor);
+			    
 			    Vector2 mouse = {event.motion.x, event.motion.y};
 			    
 			    topMenuBar.onMouseMove(mouse);
@@ -667,10 +699,6 @@ int main(int argc, char* argv[])
 
 					lastFramePos = mouse;
 				    }
-				}
-				else
-				{
-				    SDL_SetCursor(arrowCursor);
 				}
 			    }
 
@@ -955,29 +983,22 @@ int main(int argc, char* argv[])
 				    //TODO(denis): implement a proper "radio button" type
 				    // situation
 				    if (ui_wasClicked(paintToolIcon, mouse))
-				    {
-					selectedToolIcon.pos.x = paintToolIcon.background.pos.x;
-					selectedToolIcon.pos.y = paintToolIcon.background.pos.y;
-					
-					currentTool = PAINT_TOOL;
-					paintToolIcon.startedClick = false;
-					
+				    {	
+					changeCurrentTool(&currentTool, PAINT_TOOL,
+							  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+							  &selectedToolIcon, &selectionVisible);
 				    }
 				    else if (ui_wasClicked(fillToolIcon, mouse))
 				    {
-					selectedToolIcon.pos.x = fillToolIcon.background.pos.x;
-					selectedToolIcon.pos.y = fillToolIcon.background.pos.y;
-					
-					currentTool = FILL_TOOL;
-					fillToolIcon.startedClick = false;
+					changeCurrentTool(&currentTool, FILL_TOOL,
+							  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+							  &selectedToolIcon, &selectionVisible);
 				    }
 				    else if (ui_wasClicked(moveToolIcon, mouse))
 				    {
-					selectedToolIcon.pos.x = moveToolIcon.background.pos.x;
-					selectedToolIcon.pos.y = moveToolIcon.background.pos.y;
-					
-					currentTool = MOVE_TOOL;
-					moveToolIcon.startedClick = false;
+					changeCurrentTool(&currentTool, MOVE_TOOL,
+							  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+							  &selectedToolIcon, &selectionVisible);
 				    }
 
 				    if (!tileMap.tiles)
@@ -1076,7 +1097,17 @@ int main(int argc, char* argv[])
 				else if (importTileSetPanel.visible)
 				{
 				    ui_eraseLetter(&importTileSetPanel);
-				}   
+				}  
+			    }
+			    
+			    if (event.key.keysym.sym == SDLK_SPACE && tileMap.tiles)
+			    {
+				if (currentTool != MOVE_TOOL)
+				    previousTool = currentTool;
+				
+				changeCurrentTool(&currentTool, MOVE_TOOL,
+						  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+						  &selectedToolIcon, &selectionVisible);
 			    }
 			    
 			} break;
@@ -1100,6 +1131,31 @@ int main(int argc, char* argv[])
 			    {
 				if (newTileMapPanelVisible())
 				    newTileMapPanelEnterPressed();
+			    }
+
+			    if (event.key.keysym.sym == SDLK_SPACE && tileMap.tiles)
+			    {
+			        changeCurrentTool(&currentTool, previousTool,
+						  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+						  &selectedToolIcon, &selectionVisible);
+			    }
+			    else if (event.key.keysym.sym == SDLK_m && tileMap.tiles)
+			    {
+				changeCurrentTool(&currentTool, MOVE_TOOL,
+						  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+						  &selectedToolIcon, &selectionVisible);
+			    }
+			    else if (event.key.keysym.sym == SDLK_f && tileMap.tiles)
+			    {
+				changeCurrentTool(&currentTool, FILL_TOOL,
+						  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+						  &selectedToolIcon, &selectionVisible);
+			    }
+			    else if (event.key.keysym.sym == SDLK_p && tileMap.tiles)
+			    {
+				changeCurrentTool(&currentTool, PAINT_TOOL,
+						  &paintToolIcon, &fillToolIcon, &moveToolIcon,
+						  &selectedToolIcon, &selectionVisible);
 			    }
 			    
 			} break;
