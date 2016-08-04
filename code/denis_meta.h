@@ -19,6 +19,9 @@ typedef int64_t int64;
 typedef float real32;
 typedef double real64;
 
+#define HEAP_ALLOC(bytes) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, bytes);
+#define HEAP_FREE(ptr) HeapFree(GetProcessHeap(), 0, ptr);
+
 #define MAX(val1, val2) ((val1) > (val2) ? (val1) : (val2))
 #define MIN(val1, val2) ((val1) < (val2) ? (val1) : (val2))
 #define SWAP_DATA(a, b, type)				\
@@ -67,8 +70,7 @@ static inline bool stringsEqual(char *A, char *B)
 
 static inline uint8* growArray(void *array, int arrayLength, int typeSize, int newLength)
 {
-    uint8 *newArray = (uint8*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-					typeSize*newLength);
+    uint8 *newArray = (uint8*)HEAP_ALLOC(typeSize*newLength);
     
     if (newArray && array != 0 && arrayLength > 0)
     {
@@ -77,7 +79,7 @@ static inline uint8* growArray(void *array, int arrayLength, int typeSize, int n
 	    *(newArray + i) = *((uint8*)array + i);
 	}
 
-	HeapFree(GetProcessHeap(), 0, array);
+        HEAP_FREE(array);
     }
     
     return newArray;

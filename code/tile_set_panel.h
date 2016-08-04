@@ -18,6 +18,7 @@ void tileSetPanelInitializeNewTileSet(char *name, SDL_Rect imageRect,
 Tile tileSetPanelGetSelectedTile();
 SDL_Texture *tileSetPanelGetCurrentTileSet();
 bool tileSetPanelImportTileSetPressed();
+int tileSetPanelGetCurrentTileSize();
 
 bool tileSetPanelVisible();
 

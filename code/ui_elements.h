@@ -168,6 +168,8 @@ void ui_eraseLetter(UIPanel *panel);
 //NOTE(denis): erases a letter from the given EditText
 void ui_eraseLetter(EditText *editText);
 
+void ui_setText(EditText *editText, char* text);
+
 TexturedRect ui_createTextField(char *text, int x, int y, uint32 colour);
 TextBox ui_createTextBox(char *text, int minWidth, int minHeight, uint32 textColour,
 			 uint32 backgroundColour);

@@ -522,6 +522,20 @@ void ui_addLetterTo(EditText *editText, char c)
     }
 }
 
+void ui_setText(EditText *editText, char* text)
+{
+    if (editText->letterCount > 0)
+    {
+	while (editText->letterCount > 0)
+	    ui_eraseLetter(editText);
+    }
+
+    for (int i = 0; text[i] != 0; ++i)
+    {
+	ui_addLetterTo(editText, text[i]);
+    }
+}
+
 void ui_processLetterTyped(char c, UIPanel *panel)
 {
     EditText *editText = getSelectedEditText(panel);

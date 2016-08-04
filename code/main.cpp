@@ -40,6 +40,31 @@
 #define WINDOW_HEIGHT 720
 #define BACKGROUND_COLOUR 60,67,69,255
 
+static inline void openImportTileSetPanel(UIPanel *importTileSetPanel,
+					  EditText *tileSizeEditText)
+{
+    importTileSetPanel->visible = true;
+
+    int32 tileSize = newTileMapPanelGetTileSize();
+    if (tileSize != 0)
+    {
+	char *tileSizeText = convertIntToString(tileSize);
+	ui_setText(tileSizeEditText, tileSizeText);
+	HEAP_FREE(tileSizeText);
+    }
+}
+
+static inline void openNewTileMapPanel()
+{
+    newTileMapPanelSetVisible(true);
+
+    int32 tileSize = tileSetPanelGetCurrentTileSize();
+    if (tileSize != 0)
+    {
+	newTileMapPanelSetTileSize(tileSize);
+    }
+}
+
 static inline void clipSelectionBoxToBoundary(TexturedRect *selectionBox,
 					      SDL_Rect bounds)
 {
@@ -379,24 +404,45 @@ int main(int argc, char* argv[])
 	    
 	    Button saveButton = {};
 	    
-	    const enum ToolType{ PAINT_TOOL,
-		   FILL_TOOL
+	    const enum ToolType
+	    {
+		PAINT_TOOL,
+		FILL_TOOL,
+		MOVE_TOOL
 	    };
 	    ToolType currentTool = PAINT_TOOL;
 	    
 	    Button paintToolIcon = ui_createImageButton("paint-brush-icon-32.png");
 	    Button fillToolIcon = ui_createImageButton("paint-can-icon-32.png");
-
+	    Button moveToolIcon = ui_createImageButton("cursor-icon-32.png");
+	    Vector2 lastFramePos = {};
+	    
+	    TexturedRect selectedToolIcon = loadImage(renderer, "selected-icon-32.png");
+	    TexturedRect hoveringToolIcon = loadImage(renderer, "hovering-icon-32.png");
+	    bool hoverToolIconVisible = false;
+	    
 	    {
 		int x = tileMapPanel.panel.pos.x + tileMapPanel.getWidth() - paintToolIcon.getWidth() - 15;
 		int y = tileMapPanel.panel.pos.y + 15;
 		paintToolIcon.setPosition({x, y});
-		fillToolIcon.setPosition({x, y+paintToolIcon.getHeight() + 5});
+		selectedToolIcon.pos.x = x;
+		selectedToolIcon.pos.y = y;
+		    
+		y += paintToolIcon.getHeight() + 5;
+		fillToolIcon.setPosition({x, y});
+
+		y += fillToolIcon.getHeight() + 5;
+		moveToolIcon.setPosition({x, y});
 
 		tileMapArea.w = x - tileMapArea.x - 15;
 	    }
 	    ui_addToPanel(&paintToolIcon, &tileMapPanel);
 	    ui_addToPanel(&fillToolIcon, &tileMapPanel);
+	    ui_addToPanel(&moveToolIcon, &tileMapPanel);
+	    ui_addToPanel(&selectedToolIcon, &tileMapPanel);
+
+	    SDL_Cursor *arrowCursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+	    SDL_Cursor *handCursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
 	    
 	    while (running)
 	    {
@@ -567,6 +613,88 @@ int main(int argc, char* argv[])
 					moveSelectionInScrolledMap(&selectionBox, tileMapVisibleArea, tileMapDrawPosOffset, mouse, tileMap.tileSize);
 				}
 			    }
+			    else if(currentTool == MOVE_TOOL && tileMapPanel.visible &&
+				    tileMap.tiles)
+			    {
+				if (pointInRect(mouse, tileMapVisibleArea))
+				{
+				    SDL_SetCursor(handCursor);
+
+				    if (event.motion.state & SDL_BUTTON_LMASK &&
+					(backgroundBarX.image || backgroundBarY.image))
+				    {
+				        tileMapDrawPosOffset.x += lastFramePos.x - mouse.x;
+				        tileMapDrawPosOffset.y += lastFramePos.y - mouse.y;
+
+					if (tileMapDrawPosOffset.x < 0)
+					{
+					    tileMapDrawPosOffset.x = 0;
+					}
+					else if (tileMapDrawPosOffset.x > tileMap.widthInTiles*tileMap.tileSize - tileMapVisibleArea.w)
+					{
+					    tileMapDrawPosOffset.x = tileMap.widthInTiles*tileMap.tileSize - tileMapVisibleArea.w;
+					}
+
+					if (tileMapDrawPosOffset.y < 0)
+					{
+					    tileMapDrawPosOffset.y = 0;
+					}
+					else if (tileMapDrawPosOffset.y > tileMap.heightInTiles*tileMap.tileSize - tileMapVisibleArea.h)
+					{
+					    tileMapDrawPosOffset.y = tileMap.heightInTiles*tileMap.tileSize - tileMapVisibleArea.h;
+					}
+
+					scrollingBarY.pos.y = (int32)((real32)tileMapDrawPosOffset.y / (tileMap.heightInTiles*tileMap.tileSize - tileMapVisibleArea.h) * (backgroundBarY.pos.h - scrollingBarY.pos.h) + backgroundBarY.pos.y);
+					scrollingBarX.pos.x = (int32)((real32)tileMapDrawPosOffset.x / (tileMap.widthInTiles*tileMap.tileSize - tileMapVisibleArea.w) * (backgroundBarX.pos.w - scrollingBarX.pos.w) + backgroundBarX.pos.x);
+					
+					if (scrollingBarX.pos.x < backgroundBarX.pos.x)
+					{
+					    scrollingBarX.pos.x = backgroundBarX.pos.x;
+					}
+					else if (scrollingBarX.pos.x > backgroundBarX.pos.x + backgroundBarX.pos.w - scrollingBarX.pos.w)
+					{
+					    scrollingBarX.pos.x = backgroundBarX.pos.x + backgroundBarX.pos.w - scrollingBarX.pos.w;
+					}
+
+					if (scrollingBarY.pos.y < backgroundBarY.pos.y)
+					{
+					    scrollingBarY.pos.y = backgroundBarY.pos.y;
+					}
+					else if (scrollingBarY.pos.y > backgroundBarY.pos.y + backgroundBarY.pos.h - scrollingBarY.pos.h)
+					{
+					    scrollingBarY.pos.y = backgroundBarY.pos.y + backgroundBarY.pos.h - scrollingBarY.pos.h;
+					}
+
+					lastFramePos = mouse;
+				    }
+				}
+				else
+				{
+				    SDL_SetCursor(arrowCursor);
+				}
+			    }
+
+			    hoverToolIconVisible = true;
+			    if (pointInRect(mouse, paintToolIcon.background.pos))
+			    {
+				hoveringToolIcon.pos.x = paintToolIcon.background.pos.x;
+				hoveringToolIcon.pos.y = paintToolIcon.background.pos.y;
+			    }
+			    else if (pointInRect(mouse, fillToolIcon.background.pos))
+			    {
+				hoveringToolIcon.pos.x = fillToolIcon.background.pos.x;
+				hoveringToolIcon.pos.y = fillToolIcon.background.pos.y;
+			    }
+			    else if (pointInRect(mouse, moveToolIcon.background.pos))
+			    {
+				hoveringToolIcon.pos.x = moveToolIcon.background.pos.x;
+				hoveringToolIcon.pos.y = moveToolIcon.background.pos.y;
+			    }
+			    else
+			    {
+				hoverToolIconVisible = false;
+			    }
+			    
 			} break;
 
 			case SDL_MOUSEBUTTONDOWN:
@@ -665,6 +793,17 @@ int main(int argc, char* argv[])
 					    }
 					}
 				    }
+				    else if (currentTool == MOVE_TOOL && tileMap.tiles)
+				    {
+					if ((backgroundBarX.image || backgroundBarY.image) &&
+					    event.button.button == SDL_BUTTON_LEFT)
+					{
+					    if (pointInRect(mouse, tileMapVisibleArea))
+					    {
+					        lastFramePos = mouse;
+					    }
+					}
+				    }
 				}
 			    }
 			    
@@ -694,17 +833,9 @@ int main(int argc, char* argv[])
 				}
 				else if (ui_wasClicked(openButton, mouse))
 				{
-				    int tileSize;
-				    if (tileMap.tileSize != 0)
-				    {
-					tileSize = tileMap.tileSize;
-				    }
-				    else
-				    {
-					tileSize = convertStringToInt(tileSizeEditText.text,
+				    int tileSize = convertStringToInt(tileSizeEditText.text,
 								      tileSizeEditText.letterCount);
-				    }
-
+				    
 				    char *warning = "";
 				    if (tileSize == 0)
 				    {
@@ -796,13 +927,13 @@ int main(int argc, char* argv[])
 				    if (selectionY == 1)
 				    {
 					//NOTE(denis): 1 == "create new tile map"
-					newTileMapPanelSetVisible(true);
+				        openNewTileMapPanel();
 					topMenuBar.menus[0].isOpen = false;
 				    }
 				    else if (selectionY == 4)
 				    {
 					//NOTE(denis): 4 = "import tile sheet"
-					importTileSetPanel.visible = true;
+					openImportTileSetPanel(&importTileSetPanel, &tileSizeEditText);
 					topMenuBar.menus[0].isOpen = false;
 				    }
 				}
@@ -814,7 +945,7 @@ int main(int argc, char* argv[])
 				    tileSetPanelOnMouseUp(mouse, mouseButton);
 
 				    if (tileSetPanelImportTileSetPressed())
-					importTileSetPanel.visible = true;
+				        openImportTileSetPanel(&importTileSetPanel, &tileSizeEditText);
 				}
 			    
 				//TODO(denis): have something like "!click used" or
@@ -825,20 +956,35 @@ int main(int argc, char* argv[])
 				    // situation
 				    if (ui_wasClicked(paintToolIcon, mouse))
 				    {
+					selectedToolIcon.pos.x = paintToolIcon.background.pos.x;
+					selectedToolIcon.pos.y = paintToolIcon.background.pos.y;
+					
 					currentTool = PAINT_TOOL;
 					paintToolIcon.startedClick = false;
+					
 				    }
 				    else if (ui_wasClicked(fillToolIcon, mouse))
 				    {
+					selectedToolIcon.pos.x = fillToolIcon.background.pos.x;
+					selectedToolIcon.pos.y = fillToolIcon.background.pos.y;
+					
 					currentTool = FILL_TOOL;
 					fillToolIcon.startedClick = false;
+				    }
+				    else if (ui_wasClicked(moveToolIcon, mouse))
+				    {
+					selectedToolIcon.pos.x = moveToolIcon.background.pos.x;
+					selectedToolIcon.pos.y = moveToolIcon.background.pos.y;
+					
+					currentTool = MOVE_TOOL;
+					moveToolIcon.startedClick = false;
 				    }
 
 				    if (!tileMap.tiles)
 				    {
 					if (ui_wasClicked(createNewTileMapButton, mouse))
 					{
-					    newTileMapPanelSetVisible(true);
+					    openNewTileMapPanel();
 					    createNewTileMapButton.startedClick = false;
 					}
 				    }
@@ -1039,6 +1185,11 @@ int main(int argc, char* argv[])
 		{
 		    ui_draw(&tileMapPanel);
 
+		    if (hoverToolIconVisible)
+		    {
+			ui_draw(&hoveringToolIcon);
+		    }
+		    
 		    if (!tileMap.tiles)
 		    {
 			ui_draw(&createNewTileMapButton);

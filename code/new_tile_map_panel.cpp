@@ -435,9 +435,9 @@ bool newTileMapPanelDataReady()
     
     char *tileMapName = _tileMapNameEditText.text;
 
-    int tileSize = (uint32)convertStringToInt(_tileSizeEditText.text, _tileSizeEditText.letterCount);
-    int widthInTiles = (uint32)convertStringToInt(_widthTilesEditText.text, _widthTilesEditText.letterCount);
-    int heightInTiles = (uint32)convertStringToInt(_heightTilesEditText.text, _heightTilesEditText.letterCount);
+    int tileSize = convertStringToInt(_tileSizeEditText.text, _tileSizeEditText.letterCount);
+    int widthInTiles = convertStringToInt(_widthTilesEditText.text, _widthTilesEditText.letterCount);
+    int heightInTiles = convertStringToInt(_heightTilesEditText.text, _heightTilesEditText.letterCount);
 				
     result = (tileMapName[0] != 0 && tileSize != 0 &&
 	      widthInTiles != 0 && heightInTiles != 0 &&
@@ -466,4 +466,18 @@ NewTileMapPanelData *newTileMapPanelGetData()
 void newTileMapPanelDraw()
 {
     ui_draw(&_panel);
+}
+
+int32 newTileMapPanelGetTileSize()
+{
+    int32 result = (int32) convertStringToInt(_tileSizeEditText.text, _tileSizeEditText.letterCount);
+    return result;
+}
+
+void newTileMapPanelSetTileSize(int newSize)
+{
+    char *tileSizeString = convertIntToString(newSize);
+    ui_setText(&_tileSizeEditText, tileSizeString);
+
+    HEAP_FREE(tileSizeString);
 }

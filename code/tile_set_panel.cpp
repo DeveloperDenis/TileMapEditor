@@ -274,6 +274,16 @@ bool tileSetPanelImportTileSetPressed()
     return result;
 }
 
+int tileSetPanelGetCurrentTileSize()
+{
+    int result = 0;
+    
+    if (_numTileSets > 0)
+	result = _tileSets[0].tileSize;
+
+    return result;
+}
+
 bool tileSetPanelVisible()
 {
     return _panel.visible;

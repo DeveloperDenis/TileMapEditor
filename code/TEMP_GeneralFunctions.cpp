@@ -1,11 +1,28 @@
 #include "SDL_rect.h"
 #include "SDL_image.h"
 #include "denis_math.h"
+#include "math.h"
 
 static inline bool pointInRect(Vector2 point, SDL_Rect rect)
 {
     return point.x > rect.x && point.x < rect.x+rect.w &&
 	point.y > rect.y && point.y < rect.y+rect.h;
+}
+
+static inline char* convertIntToString(int num)
+{
+    //NOTE(denis): +1 because log10 is one character off
+    // and the second +1 because we want to create a valid null-terminated string
+    int numCharacters = ((int)log10((float)num)+1) + 1;
+    char *result = (char*)HEAP_ALLOC(numCharacters);
+
+    for (int i = numCharacters-2; i >= 0; --i)
+    {
+	result[i] = '0' + num%10;
+	num /= 10;
+    }
+    
+    return result;
 }
 
 static inline int convertStringToInt(char string[], int size)

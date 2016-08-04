@@ -33,4 +33,7 @@ NewTileMapPanelData* newTileMapPanelGetData();
 
 void newTileMapPanelDraw();
 
+void newTileMapPanelSetTileSize(int32 newSize);
+int32 newTileMapPanelGetTileSize();
+
 #endif
