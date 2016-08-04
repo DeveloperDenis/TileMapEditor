@@ -14,6 +14,8 @@
  * DISABLE top menu bar when popup is visible
  *
  * add a keyboard shortcut to change to next tool and change to previous tool
+ *
+ * add tool tips
  */
 
 //IMPORTANT(denis): note to self, design everything expecting at least a 1280 x 720
@@ -226,7 +228,8 @@ static TileMap createNewTileMap(int startX, int startY,
     newTileMap.offset.y = startY;
     
     NewTileMapPanelData* data = newTileMapPanelGetData();
-    
+
+    newTileMap.name = data->tileMapName;
     newTileMap.widthInTiles = data->widthInTiles;
     newTileMap.heightInTiles = data->heightInTiles;
     newTileMap.tileSize = data->tileSize;
@@ -290,8 +293,6 @@ int main(int argc, char* argv[])
 	    && IMG_Init(IMG_INIT_PNG) != 0)
 	{   
 	    bool running = true;
-	    
-	    char *tileMapName = NULL;
 
 	    TexturedRect defaultTile = loadImage(renderer, "default_tile.png");
 	    TileMap tileMap = {};
@@ -437,8 +438,6 @@ int main(int argc, char* argv[])
 		    createNewTileMapButton.getHeight()/2;
 		createNewTileMapButton.setPosition({x, y});
 	    }
-	    
-	    Button saveButton = {};
 	    
 	    ToolType previousTool = PAINT_TOOL;
 	    ToolType currentTool = PAINT_TOOL;
@@ -834,9 +833,7 @@ int main(int argc, char* argv[])
 				    }
 				}
 			    }
-			    
-			    saveButton.startedClick = pointInRect(mouse, saveButton.background.pos);
-			    
+			   
 			    topMenuBar.onMouseDown(mouse, event.button.button);
 			    
 			} break;
@@ -958,6 +955,18 @@ int main(int argc, char* argv[])
 				        openNewTileMapPanel();
 					topMenuBar.menus[0].isOpen = false;
 				    }
+				    else if (selectionY == 3)
+				    {
+					//TODO(denis): do some checking on the tilemap
+					// before just trying to save it
+
+					if (tileMap.tiles && tileMap.name)
+					{
+					    saveTileMapToFile(&tileMap, tileMap.name);
+					    
+					    topMenuBar.menus[0].isOpen = false;
+					}
+				    }
 				    else if (selectionY == 4)
 				    {
 					//NOTE(denis): 4 = "import tile sheet"
@@ -1059,16 +1068,7 @@ int main(int argc, char* argv[])
 					}
 				    }
 				}
-			    }			
-#if 0			    
-			    //NOTE(denis): hit the save button
-			    if (tileMap.tiles && saveButton.startedClick)
-			    {
-				saveTileMapToFile(&tileMap, tileMapName);
-				
-				saveButton.startedClick = false;
 			    }
-#endif
 			} break;
 
 			case SDL_TEXTINPUT:
@@ -1166,11 +1166,7 @@ int main(int argc, char* argv[])
 		SDL_RenderClear(renderer);
 
 		if (newTileMapPanelVisible())
-		{
-		    //TODO(denis): if the new tile map panel "tile size" field
-		    // doesn't have anything in it, make the default the same as the
-		    // current tile set's tile size
-		    
+		{   
 		    if (newTileMapPanelDataReady())
 		    {
 			int32 x = tileMapArea.x;

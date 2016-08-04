@@ -19,6 +19,7 @@ struct Tile
 struct TileMap
 {
     Tile *tiles;
+    char *name;
     int tileSize;
     int widthInTiles;
     int heightInTiles;

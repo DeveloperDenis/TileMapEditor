@@ -19,9 +19,10 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 	    charsToExtension = i+1;
 	    done = true;
 	    fileName[i] = '.';
-	    fileName[i+1] = 'j';
-	    fileName[i+2] = 's';
-	    fileName[i+3] = '\0';
+	    fileName[i+1] = 't';
+	    fileName[i+2] = 'x';
+	    fileName[i+3] = 't';
+	    fileName[i+4] = '\0';
 	}
 	else
 	    fileName[i] = tileMapName[i];
@@ -31,7 +32,7 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
     
     OPENFILENAME openFileName = {};
     openFileName.lStructSize = sizeof(OPENFILENAME);
-    char *filter = "JavaScript File\0*.js\0Text File\0*.txt\0\0";
+    char *filter = "Text File\0*.txt\0\0";
     openFileName.lpstrFilter = filter;
     openFileName.lpstrFile = fileName;
     openFileName.nMaxFile = fileNameBufferSize;
@@ -39,7 +40,7 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
     //openFileName.lpstrFileTitle = ;
     openFileName.Flags = OFN_OVERWRITEPROMPT;
     openFileName.nFileExtension = (WORD)charsToExtension;
-    openFileName.lpstrDefExt = "js";
+    openFileName.lpstrDefExt = "txt";
     
     BOOL result =  GetSaveFileName(&openFileName);
 
@@ -54,12 +55,8 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 	{
 	    if (fopen_s(&outputFile, fileName, "w") == 0)
 	    {
-		fprintf(outputFile, "var %s = [", tileMapName);
-
 		for (int i = 0; i < tileMap->heightInTiles; ++i)
 		{
-		    fprintf(outputFile, "[");
-		
 		    for (int j = 0; j < tileMap->widthInTiles; ++j)
 		    {
 			Tile* tile = (tileMap->tiles + i*tileMap->widthInTiles + j);
@@ -77,20 +74,10 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 			}
 		    
 			fprintf(outputFile, "%d", tileValue);
-
-			if (j < tileMap->widthInTiles-1)
-			    fprintf(outputFile, ", ");
 		    }
 
-		    fprintf(outputFile, "]");
-
-		    if (i < tileMap->heightInTiles-1)
-			fprintf(outputFile, ",\n");
-		    else
-			fprintf(outputFile, "\n");
+		    fprintf(outputFile, "\n");
 		}
-	    
-		fprintf(outputFile, "];");
 	    
 		fclose(outputFile);
 	    }
