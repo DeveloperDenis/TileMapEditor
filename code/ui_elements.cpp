@@ -213,12 +213,28 @@ void MenuBar::addMenu(char *items[], int numItems, int menuWidth)
     ++this->menuCount;
 }
 
-void MenuBar::onMouseMove(Vector2 mousePos)
+bool MenuBar::isOpen()
 {
+    bool result = false;
+    
+    for (int i = 0; i < this->menuCount; ++i)
+    {
+	if (this->menus[i].isOpen)
+	    result = true;
+    }
+
+    return result;
+}
+
+bool MenuBar::onMouseMove(Vector2 mousePos)
+{
+    bool result = false;
+    
     for (int i = 0; i < this->menuCount; ++i)
     {
 	if (pointInRect(mousePos, this->menus[i].getRect()))
 	{
+	    result = true;
 	    SDL_Rect tempRect = this->menus[i].getRect();
 	    int selectedY = (mousePos.y - tempRect.y)/this->menus[i].items[0].pos.h;
 	    this->menus[i].highlightedItem = selectedY;
@@ -226,6 +242,8 @@ void MenuBar::onMouseMove(Vector2 mousePos)
 	else
 	    this->menus[i].highlightedItem = -1;
     }
+    
+    return result;
 }
 
 void MenuBar::onMouseDown(Vector2 mousePos, Uint8 button)
@@ -859,6 +877,35 @@ UIPanel ui_createPanel(int x, int y, int width, int height, uint32 colour)
     return result;
 }
 
+ScrollBar ui_createScrollBar(int32 x, int32 y, int32 bigWidth, int32 smallWidth,
+			     int32 height, uint32 bigColour, uint32 smallColour,
+			     bool vertical)
+{
+    ScrollBar result = {};
+
+    if (vertical)
+    {
+	result.backgroundRect =
+	    createFilledTexturedRect(_renderer, height, bigWidth, bigColour);
+
+	result.scrollingRect =
+	    createFilledTexturedRect(_renderer, height, smallWidth, smallColour);
+    }
+    else
+    {
+	result.backgroundRect =
+	    createFilledTexturedRect(_renderer, bigWidth, height, bigColour);
+
+	result.scrollingRect =
+	    createFilledTexturedRect(_renderer, smallWidth, height, smallColour);
+    }
+    
+    result.scrollingRect.pos.y = result.backgroundRect.pos.y = y;
+    result.scrollingRect.pos.x = result.backgroundRect.pos.x = x;
+    
+    return result;
+}
+
 UIElement ui_packIntoUIElement(EditText *editText)
 {
     UIElement result = {};
@@ -1076,5 +1123,14 @@ void ui_draw(MenuBar *menuBar)
     for (int i = 0; i < menuBar->menuCount; ++i)
     {
 	ui_draw(&menuBar->menus[i]);
+    }
+}
+
+void ui_draw(ScrollBar *scrollBar)
+{
+    if (scrollBar)
+    {
+	ui_draw(&scrollBar->backgroundRect);
+	ui_draw(&scrollBar->scrollingRect);
     }
 }

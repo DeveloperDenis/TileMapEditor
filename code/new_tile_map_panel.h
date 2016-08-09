@@ -30,6 +30,7 @@ void newTileMapPanelSetVisible(bool newValue);
 
 bool newTileMapPanelDataReady();
 NewTileMapPanelData* newTileMapPanelGetData();
+void newTileMapPanelResetData();
 
 void newTileMapPanelDraw();
 

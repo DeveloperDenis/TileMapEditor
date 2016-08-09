@@ -103,11 +103,21 @@ struct MenuBar
 
     void addMenu(char *items[], int numItems, int menuWidth);
 
-    void onMouseMove(Vector2 mousePos);
+    bool isOpen();
+    
+    bool onMouseMove(Vector2 mousePos);
     void onMouseDown(Vector2 mousePos, Uint8 button);
     bool onMouseUp(Vector2 mousePos, Uint8 button);
 
     int getHeight() { return this->menus[0].getRect().h; };
+};
+
+struct ScrollBar
+{
+    TexturedRect backgroundRect;
+    TexturedRect scrollingRect;
+    int32 scrollClickDelta;
+    bool scrolling;
 };
 
 enum UIElementType
@@ -186,6 +196,9 @@ DropDownMenu ui_createDropDownMenu(char *items[], int itemNum,
 MenuBar ui_createMenuBar(int x, int y, int width, int height, uint32 colour,
 			 uint32 textColour);
 UIPanel ui_createPanel(int x, int y, int width, int height, uint32 colour);
+ScrollBar ui_createScrollBar(int32 x, int32 y, int32 bigWidth, int32 smallWidth,
+			     int32 height, uint32 bigColour, uint32 smallColour,
+			     bool vertical);
 //NOTE(denis): if you don't pass a panel, it returns a new panel containing the item
 // you added
 UIPanel ui_addToPanel(EditText *editText);
@@ -220,6 +233,7 @@ void ui_draw(EditText *editText);
 void ui_draw(TextBox *textBox);
 void ui_draw(DropDownMenu *dropDownMenu);
 void ui_draw(MenuBar *menuBar);
+void ui_draw(ScrollBar *scrollBar);
 
 const uint32 COLOUR_WHITE = 0xFFFFFFFF;
 const uint32 COLOUR_BLACK = 0xFF000000;

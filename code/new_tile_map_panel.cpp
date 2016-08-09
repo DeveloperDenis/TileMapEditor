@@ -463,6 +463,21 @@ NewTileMapPanelData *newTileMapPanelGetData()
 	return 0;
 }
 
+void newTileMapPanelResetData()
+{
+    _data.tileMapName = 0;
+    _data.tileSize = 0;
+    _data.widthInTiles = 0;
+    _data.heightInTiles = 0;
+
+    ui_setText(&_tileMapNameEditText, "");
+    ui_setText(&_tileSizeEditText, "");
+    ui_setText(&_widthTilesEditText, "");
+    ui_setText(&_heightTilesEditText, "");
+    ui_setText(&_widthPxEditText, "");
+    ui_setText(&_heightPxEditText, "");
+}
+
 void newTileMapPanelDraw()
 {
     ui_draw(&_panel);

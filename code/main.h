@@ -25,7 +25,10 @@ struct TileMap
     int heightInTiles;
     
     Vector2 offset;
-
+    Vector2 drawOffset;
+    
+    SDL_Rect visibleArea;
+    
     //TODO(denis): create a setPosition function that will reposition all of the
     // tiles contained within as well
     
