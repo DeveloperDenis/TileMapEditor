@@ -258,6 +258,9 @@ int main(int argc, char* argv[])
 				if (pointInRect(mouse, topMenuBar.menus[0].getRect()))
 				{
 				    //NOTE(denis): clicked on the file menu
+
+				    topMenuBar.menus[0].isOpen = false;
+				    
 				    int selectionY = (mouse.y - topMenuBar.menus[0].getRect().y)/topMenuBar.menus[0].items[0].pos.h;
 				    if (selectionY == 1)
 				    {
@@ -279,12 +282,17 @@ int main(int argc, char* argv[])
 					//NOTE(denis): 4 = "import tile sheet"
 					openImportTileSetPanel();
 				    }
+				    else if (selectionY == 0)
+				    {
+					topMenuBar.menus[0].isOpen = true;
+				    }
 				    
-				    topMenuBar.menus[0].isOpen = false;
 				}
 				else if (pointInRect(mouse, topMenuBar.menus[1].getRect()))
 				{
 				    //NOTE(denis): clicked on the tile map menu
+				    topMenuBar.menus[1].isOpen = false;
+				    
 				    uint32 selectionY = (mouse.y - topMenuBar.menus[1].getRect().y)/topMenuBar.menus[1].items[0].pos.h;
 				    if (selectionY == (uint32)(topMenuBar.menus[1].itemCount-1))
 				    {
@@ -294,8 +302,10 @@ int main(int argc, char* argv[])
 				    {
 					tileMapPanelSelectTileMap(selectionY-1);
 				    }
-				    
-				    topMenuBar.menus[1].isOpen = false;
+				    else if (selectionY == 0)
+				    {
+					topMenuBar.menus[1].isOpen = true;
+				    }
 				}
 			    }
 			    else if (tileSetPanelVisible() || tileMapPanelVisible())

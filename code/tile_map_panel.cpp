@@ -73,9 +73,7 @@ static TileMap createNewTileMap(int startX, int startY,
     *outHeight = newTileMap.heightInTiles*newTileMap.tileSize;
     
     int memorySize = sizeof(Tile)*newTileMap.widthInTiles*newTileMap.heightInTiles;
-    
-    HANDLE heapHandle = GetProcessHeap();
-    newTileMap.tiles = (Tile*) HeapAlloc(heapHandle, HEAP_ZERO_MEMORY, memorySize);
+    newTileMap.tiles = (Tile*) HEAP_ALLOC(memorySize);
 
     if (newTileMap.tiles)
     {	

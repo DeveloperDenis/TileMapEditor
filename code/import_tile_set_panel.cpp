@@ -43,7 +43,13 @@ void importTileSetPanelCreateNew(SDL_Renderer *renderer, int32 x, int32 y,
 	ui_createEditText(_tileSizeText.pos.x + _tileSizeText.getWidth() + PADDING,
 			  _tileSizeText.pos.y, 100, _tileSizeText.getHeight(),
 			  COLOUR_WHITE, 5);
-    char chars[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0 };
+
+    char *chars = (char*)HEAP_ALLOC(11);
+    for (char i = 0; i < 10; ++i)
+    {
+	chars[i] = '0' + i;
+    }
+
     _tileSizeEditText.allowedCharacters = chars;
     ui_addToPanel(&_tileSizeEditText, &_panel);
 
