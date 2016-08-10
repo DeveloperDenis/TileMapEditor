@@ -49,8 +49,6 @@ static ToolType _previousTool;
 static TileMap _tileMaps[5];
 static uint32 _numTileMaps;
 static uint32 _selectedTileMap;
-static ScrollBar _verticalBar;
-static ScrollBar _horizontalBar;
 
 static SDL_Cursor *_arrowCursor;
 static SDL_Cursor *_handCursor;
@@ -483,10 +481,8 @@ void tileMapPanelDraw()
 		    }
 		}
 
-		//TODO(denis): put more conditions on the drawing of the scroll bars
-		// only draw them on tile maps that need them
-		ui_draw(&_verticalBar);
-		ui_draw(&_horizontalBar);
+		ui_draw(&currentMap->verticalBar);
+		ui_draw(&currentMap->horizontalBar);
 	    }	
 	}
 
@@ -501,14 +497,16 @@ void tileMapPanelOnMouseMove(Vector2 mousePos, int32 leftClickFlag)
 
     TileMap *currentMap = &_tileMaps[_selectedTileMap];
     int32 tileSize = currentMap->tileSize;
-    
-    if (_horizontalBar.scrolling)
+
+    //TODO(denis): could probably simplify the two if statements into one function
+    // call
+    if (currentMap->horizontalBar.scrolling)
     {
-	scrollTileMap(&_horizontalBar, false, mousePos, currentMap);
+	scrollTileMap(&currentMap->horizontalBar, false, mousePos, currentMap);
     }
-    else if (_verticalBar.scrolling)
+    else if (currentMap->verticalBar.scrolling)
     {
-	scrollTileMap(&_verticalBar, true, mousePos, currentMap);
+	scrollTileMap(&currentMap->verticalBar, true, mousePos, currentMap);
     }
     else if (_currentTool == PAINT_TOOL && _panel.visible && currentMap->tiles)
     {
@@ -607,7 +605,7 @@ void tileMapPanelOnMouseMove(Vector2 mousePos, int32 leftClickFlag)
 	{
 	    SDL_SetCursor(_handCursor);
 	    
-	    if (leftClickFlag && (_horizontalBar.scrollingRect.image || _verticalBar.scrollingRect.image))
+	    if (leftClickFlag && (currentMap->horizontalBar.scrollingRect.image || currentMap->verticalBar.scrollingRect.image))
 	    {
 		currentMap->drawOffset.x += _lastFramePos.x - mousePos.x;
 	        currentMap->drawOffset.y += _lastFramePos.y - mousePos.y;
@@ -630,10 +628,10 @@ void tileMapPanelOnMouseMove(Vector2 mousePos, int32 leftClickFlag)
 		    currentMap->drawOffset.y = currentMap->heightInTiles*tileSize - currentMap->visibleArea.h;
 		}
 
-		TexturedRect *scrollingBarY = &_verticalBar.scrollingRect;
-		TexturedRect *backgroundBarY = &_verticalBar.backgroundRect;
-		TexturedRect *scrollingBarX = &_horizontalBar.scrollingRect;
-		TexturedRect *backgroundBarX = &_horizontalBar.backgroundRect;
+		TexturedRect *scrollingBarY = &currentMap->verticalBar.scrollingRect;
+		TexturedRect *backgroundBarY = &currentMap->verticalBar.backgroundRect;
+		TexturedRect *scrollingBarX = &currentMap->horizontalBar.scrollingRect;
+		TexturedRect *backgroundBarX = &currentMap->horizontalBar.backgroundRect;
 		
 		scrollingBarY->pos.y = (int32)((real32)currentMap->drawOffset.y / (currentMap->heightInTiles*tileSize - currentMap->visibleArea.h) * (backgroundBarY->pos.h - scrollingBarY->pos.h) + backgroundBarY->pos.y);
 		scrollingBarX->pos.x = (int32)((real32)currentMap->drawOffset.x / (currentMap->widthInTiles*tileSize - currentMap->visibleArea.w) * (backgroundBarX->pos.w - scrollingBarX->pos.w) + backgroundBarX->pos.x);
@@ -688,15 +686,15 @@ void tileMapPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton)
     TileMap *currentMap = &_tileMaps[_selectedTileMap];
     int32 tileSize = currentMap->tileSize;
     
-    if (pointInRect(mousePos, _horizontalBar.scrollingRect.pos))
+    if (pointInRect(mousePos, currentMap->horizontalBar.scrollingRect.pos))
     {
-        _horizontalBar.scrolling = true;
-	_horizontalBar.scrollClickDelta = mousePos.x - _horizontalBar.scrollingRect.pos.x;
+        currentMap->horizontalBar.scrolling = true;
+	currentMap->horizontalBar.scrollClickDelta = mousePos.x - currentMap->horizontalBar.scrollingRect.pos.x;
     }
-    else if (pointInRect(mousePos, _verticalBar.scrollingRect.pos))
+    else if (pointInRect(mousePos, currentMap->verticalBar.scrollingRect.pos))
     {
-	_verticalBar.scrolling = true;
-	_verticalBar.scrollClickDelta = mousePos.y - _verticalBar.scrollingRect.pos.y;
+	currentMap->verticalBar.scrolling = true;
+	currentMap->verticalBar.scrollClickDelta = mousePos.y - currentMap->verticalBar.scrollingRect.pos.y;
     }
 				    
     ui_processMouseDown(&_panel, mousePos, mouseButton);
@@ -764,7 +762,7 @@ void tileMapPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton)
     }
     else if (_currentTool == MOVE_TOOL && currentMap->tiles)
     {
-	if ((_horizontalBar.backgroundRect.image || _verticalBar.backgroundRect.image) &&
+	if ((currentMap->horizontalBar.backgroundRect.image || currentMap->verticalBar.backgroundRect.image) &&
 	    mouseButton == SDL_BUTTON_LEFT)
 	{
 	    if (pointInRect(mousePos, currentMap->visibleArea))
@@ -780,8 +778,8 @@ void tileMapPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
     TileMap *currentMap = &_tileMaps[_selectedTileMap];
     int32 tileSize = currentMap->tileSize;
     
-    _verticalBar.scrolling = false;
-    _horizontalBar.scrolling = false;
+    currentMap->verticalBar.scrolling = false;
+    currentMap->horizontalBar.scrolling = false;
 
     //TODO(denis): implement a proper "radio button" type
     // situation
@@ -946,7 +944,7 @@ TileMap* tileMapPanelAddNewTileMap()
 	int32 barX = _tileMapArea.x;
 	int32 barY = result->offset.y + result->visibleArea.h + 4;
 	
-	_horizontalBar =
+        result->horizontalBar =
 	    ui_createScrollBar(barX, barY, bigBarWidth, smallBarWidth,
 			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
 			       false);
@@ -961,7 +959,7 @@ TileMap* tileMapPanelAddNewTileMap()
 	int32 barY = _tileMapArea.y;
 	int32 smallBarWidth = (int32)(_tileMapArea.h*sizeRatio);
 	
-	_verticalBar =
+        result->verticalBar =
 	    ui_createScrollBar(barX, barY, backgroundHeight, smallBarWidth,
 			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
 			       true);

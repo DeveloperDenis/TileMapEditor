@@ -27,6 +27,7 @@
 #include "windows.h"
 #include <math.h>
 
+#include "ui_elements.h"
 #include "main.h"
 #include "file_saving_loading.h"
 #include "denis_math.h"
@@ -35,8 +36,6 @@
 #include "tile_map_panel.h"
 #include "import_tile_set_panel.h"
 #include "TEMP_GeneralFunctions.cpp"
-
-#include "ui_elements.h"
 
 #define TITLE "Tile Map Editor"
 #define WINDOW_WIDTH 1280

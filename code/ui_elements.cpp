@@ -1,5 +1,5 @@
-#include "main.h"
 #include "ui_elements.h"
+#include "main.h"
 #include "SDL_render.h"
 #include "TEMP_GeneralFunctions.cpp"
 

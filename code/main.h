@@ -16,35 +16,6 @@ struct Tile
     SDL_Rect sheetPos;
 };
 
-struct TileMap
-{
-    Tile *tiles;
-    char *name;
-    int tileSize;
-    int widthInTiles;
-    int heightInTiles;
-    
-    Vector2 offset;
-    Vector2 drawOffset;
-    
-    SDL_Rect visibleArea;
-    
-    //TODO(denis): create a setPosition function that will reposition all of the
-    // tiles contained within as well
-    
-    SDL_Rect getRect()
-    {
-	SDL_Rect result = {};
-	
-	result.x = offset.x;
-	result.y = offset.y;
-	result.w = tileSize*widthInTiles;
-	result.h = tileSize*heightInTiles;
-	
-	return result;
-    }
-};
-
 struct TileSet
 {
     char *name;

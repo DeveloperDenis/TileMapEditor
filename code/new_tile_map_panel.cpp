@@ -425,7 +425,7 @@ void newTileMapPanelSetVisible(bool newValue)
 {
     _panel.visible = newValue;
 
-    if (newValue = false)
+    if (newValue == false)
 	_newTileMapClicked = false;
 }
 
@@ -433,12 +433,12 @@ bool newTileMapPanelDataReady()
 {
     bool result = false;
     
-    char *tileMapName = _tileMapNameEditText.text;
+    char *tileMapName = copyString(_tileMapNameEditText.text);
 
     int tileSize = convertStringToInt(_tileSizeEditText.text, _tileSizeEditText.letterCount);
     int widthInTiles = convertStringToInt(_widthTilesEditText.text, _widthTilesEditText.letterCount);
     int heightInTiles = convertStringToInt(_heightTilesEditText.text, _heightTilesEditText.letterCount);
-				
+    
     result = (tileMapName[0] != 0 && tileSize != 0 &&
 	      widthInTiles != 0 && heightInTiles != 0 &&
 	      _newTileMapClicked);

@@ -68,6 +68,29 @@ static inline bool stringsEqual(char *A, char *B)
     return result;
 }
 
+static char* copyString(char *string)
+{
+    char *result = 0;
+    
+    if (string)
+    {
+	uint32 numChars = 0;
+	for (uint32 i = 0; string[i] != 0; ++i)
+	{
+	    ++numChars;
+	}
+
+	result = (char*)HEAP_ALLOC(numChars+1);
+
+	for (uint32 i = 0; i < numChars; ++i)
+	{
+	    result[i] = string[i];
+	}
+    }
+
+    return result;
+}
+
 static inline uint8* growArray(void *array, int arrayLength, int typeSize, int newLength)
 {
     uint8 *newArray = (uint8*)HEAP_ALLOC(typeSize*newLength);

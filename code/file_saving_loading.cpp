@@ -1,5 +1,7 @@
+#include "ui_elements.h"
 #include "file_saving_loading.h"
 #include "main.h"
+#include "tile_map_panel.h"
 #include "stdio.h"
 #include "windows.h"
 
