@@ -120,9 +120,9 @@ void importTileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 	}
 	else
 	{
-	    TexturedRect newTileSheet = loadImage(_renderer, _tileSheetEditText.text);
+	    SDL_Surface *newTileSheet = loadImageAsSurface(_tileSheetEditText.text);
 
-	    if (newTileSheet.image != 0)
+	    if (newTileSheet != 0)
 	    {
 		char *fileName = _tileSheetEditText.text;
 		int startOfFileName = 0;
@@ -145,9 +145,9 @@ void importTileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 		//TODO(denis): don't have the ".png" part?
 		fileNameTruncated[endOfFileName-startOfFileName] = 0;
 
-		tileSetPanelInitializeNewTileSet(fileNameTruncated, newTileSheet.pos, newTileSheet.image,
+		tileSetPanelInitializeNewTileSet(fileNameTruncated, newTileSheet,
 						 tileSize);
-					    
+		
 		_panel.visible = false;
 	    }
 	    else

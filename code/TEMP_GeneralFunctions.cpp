@@ -71,6 +71,15 @@ static inline TexturedRect loadImage(SDL_Renderer *renderer, char *fileName)
     return result;
 }
 
+static inline SDL_Surface* loadImageAsSurface(char *fileName)
+{
+    SDL_Surface *result = 0;
+
+    result = IMG_Load(fileName);
+    
+    return result;
+}
+
 static inline SDL_Color hexColourToRGBA(uint32 hex)
 {
     SDL_Color result = {};

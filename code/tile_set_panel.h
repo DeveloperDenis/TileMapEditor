@@ -12,8 +12,7 @@ void tileSetPanelOnMouseMove(Vector2 mousePos);
 void tileSetPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton);
 void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton);
 
-void tileSetPanelInitializeNewTileSet(char *name, SDL_Rect imageRect,
-				     SDL_Texture *image, uint32 tileSize);
+void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 tileSize);
 
 Tile tileSetPanelGetSelectedTile();
 SDL_Texture *tileSetPanelGetCurrentTileSet();

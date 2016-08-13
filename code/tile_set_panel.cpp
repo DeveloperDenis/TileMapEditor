@@ -1,4 +1,5 @@
 #include "SDL_render.h"
+#include "SDL_surface.h"
 #include "ui_elements.h"
 #include "denis_math.h"
 #include "main.h"
@@ -7,8 +8,15 @@
 
 #define MIN_WIDTH 420
 #define MIN_HEIGHT 670
-#define BACKGROUND_COLOUR 0xFF00BB55
+
+#define PANEL_COLOUR 0xFF333333
+#define PANEL_TEXT_COLOUR 0xFFFFFFFF
+#define DROP_DOWN_COLOUR 0xFFAAAAAA
+#define DROP_DOWN_TEXT_COLOUR 0xFF000000
+
 #define PADDING 15
+
+#define ALPHA_THRESHOLD 15
 
 static SDL_Renderer *_renderer;
 
@@ -19,6 +27,7 @@ static UIPanel _panel;
 static DropDownMenu _tileSetDropDown;
 static TexturedRect _selectedTileText;
 static Tile _selectedTile;
+static SDL_Rect _tempSelectedTile;
 
 static TexturedRect _selectionBox;
 static bool _selectionVisible;
@@ -27,8 +36,47 @@ static bool _importTileSetPressed;
 
 static bool _startedClick;
 
-//TODO(denis): do I even need this?
-static SDL_Rect _tempSelectedTile;
+//NOTE(denis): right now this function only returns false if every single pixel in
+// a tile has an alpha value below the threshold
+static bool tileIsValid(SDL_Surface *image, SDL_Rect tile)
+{
+    bool result = false;
+
+    //TODO(denis): how much alpha should I allow in a tile before I consider it
+    // "invalid"?
+
+    if (SDL_MUSTLOCK(image) == SDL_TRUE)
+	SDL_LockSurface(image);
+
+    uint32 bytesPerPixel = image->format->BytesPerPixel;
+    
+    if (bytesPerPixel == 4)
+    {
+	uint32 *row = (uint32*)((uint8*)image->pixels + tile.x*bytesPerPixel + tile.y*image->pitch);
+	for (int32 i = 0; i < tile.h && !result; ++i)
+	{
+	    uint32 *pixel = row;
+	    for (int32 j = 0; j < tile.w && !result; ++j)
+	    {
+		uint32 alphaValue = (*pixel) & image->format->Amask;
+		alphaValue >>= image->format->Ashift;
+
+		if (alphaValue > ALPHA_THRESHOLD)
+		{
+		    result = true;
+		}
+		
+		++pixel;
+	    }
+	    row = (uint32*)((uint8*)row + image->pitch);
+	}
+    }
+    
+    if (SDL_MUSTLOCK(image) == SDL_TRUE)
+	SDL_UnlockSurface(image);
+    
+    return result;
+}
 
 void tileSetPanelCreateNew(SDL_Renderer *renderer,
 			   uint32 x, uint32 y, uint32 width, uint32 height)
@@ -38,7 +86,7 @@ void tileSetPanelCreateNew(SDL_Renderer *renderer,
     width = MAX(width, MIN_WIDTH);
     height = MAX(height, MIN_HEIGHT);
     
-    _panel = ui_createPanel(x, y, width, height, BACKGROUND_COLOUR);
+    _panel = ui_createPanel(x, y, width, height, PANEL_COLOUR);
     
     {
 	char *items[] = {"No Tile Sheet Selected",
@@ -46,14 +94,13 @@ void tileSetPanelCreateNew(SDL_Renderer *renderer,
 	int num = 2;
 	int width = _panel.getWidth()-PADDING*2;
 	int height = 40;
-	uint32 backgroundColour = 0xFFEEEEEE;
 	_tileSetDropDown =
-	    ui_createDropDownMenu(items, num, width, height, COLOUR_BLACK,
-				  backgroundColour);
+	    ui_createDropDownMenu(items, num, width, height, DROP_DOWN_TEXT_COLOUR,
+				  DROP_DOWN_COLOUR);
     }
     ui_addToPanel(&_tileSetDropDown, &_panel);
 
-    _selectedTileText = ui_createTextField("Selected Tile:", 0, 0, COLOUR_BLACK);
+    _selectedTileText = ui_createTextField("Selected Tile:", 0, 0, PANEL_TEXT_COLOUR);
 
     tileSetPanelSetPosition({_panel.panel.pos.x, _panel.panel.pos.y});
 }
@@ -73,46 +120,46 @@ void tileSetPanelDraw()
 	    int tileSetStartX = _panel.panel.pos.x + tilesPadding;
 	    int tileSetStartY = _tileSetDropDown.items[0].pos.y +
 		_tileSetDropDown.items[0].pos.h + PADDING;
-			
-	    Tile currentTile = {};
-	    currentTile.sheetPos = {0, 0, tileSize, tileSize};
-	    currentTile.pos = {tileSetStartX, tileSetStartY, tileSize, tileSize};
-			
-	    int numTilesY = _tileSets[0].imageSize.h/tileSize;
-	    int numTilesX = _tileSets[0].imageSize.w/tileSize;
-
+	    
 	    uint32 lastY = 0;
-			
-	    for (int i = 0; i < numTilesY; ++i)
+	    
+	    for (uint32 i = 0; i < _tileSets[0].numTiles; ++i)
 	    {
-		for (int j = 0; j < numTilesX; ++j)
+		if (i == _tileSets[0].numTiles-1)
 		{
-		    //TODO(denis): don't change the position of the next
-		    // drawn tile if the tile sheet position is blank
-				
-		    currentTile.sheetPos.x = j * tileSize;
-		    currentTile.sheetPos.y = i * tileSize;
-				
-		    currentTile.pos.x = tileSetStartX + ((i*numTilesX + j) % tilesPerRow)*tileSize;
-		    currentTile.pos.y = tileSetStartY + ((i*numTilesX + j)/tilesPerRow)*tileSize;
-
-		    lastY = currentTile.pos.y;
-
-		    //TODO(denis): dunno about this tempSelectedTile thing
-		    _tempSelectedTile.w = _tempSelectedTile.h = tileSize;
-		    
-		    if (currentTile.pos.x == _selectionBox.pos.x &&
-		        currentTile.pos.y == _selectionBox.pos.y)
-		    {
-			_tempSelectedTile.x = currentTile.sheetPos.x;
-			_tempSelectedTile.y = currentTile.sheetPos.y;
-		    }
-				
-		    SDL_RenderCopy(_renderer, _tileSets[0].image,
-				   &currentTile.sheetPos, &currentTile.pos);
+		    int x = 0;
 		}
+		
+		//TODO(denis): this doesn't need to be done every frame
+		// only when everything is resized
+		uint32 xValue = tileSetStartX + (i%tilesPerRow)*tileSize;
+		uint32 yValue = tileSetStartY + (i/tilesPerRow)*tileSize;
+		
+		Tile *currentTile = _tileSets[0].tiles + i;
+		
+		currentTile->pos.x = xValue;
+		currentTile->pos.y = yValue;
+
+		lastY = yValue;
+		
+		currentTile->pos.w = tileSize;
+		currentTile->pos.h = tileSize;
+
+		_tempSelectedTile.w = _tempSelectedTile.h = tileSize;
+
+		if (currentTile->pos.x == _selectionBox.pos.x &&
+		    currentTile->pos.y == _selectionBox.pos.y)
+		{
+		    _tempSelectedTile.x = currentTile->sheetPos.x;
+		    _tempSelectedTile.y = currentTile->sheetPos.y;
+		}
+		
+		SDL_RenderCopy(_renderer, _tileSets[0].image,
+			       &currentTile->sheetPos, &currentTile->pos);
 	    }
-			
+	    
+	    //TODO(denis): should have multiple rectangles to better define the
+	    // actual collision area
 	    //TODO(denis): the height is wrong if there are a bunch of
 	    // blank tiles being "drawn"
 	    _tileSets[0].collisionBox.x = tileSetStartX;
@@ -204,21 +251,40 @@ void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
     }
     else if (_selectionVisible && _startedClick && mouseButton == SDL_BUTTON_LEFT)
     {
-	//TODO(denis): does this need to be like this?
 	_selectedTile.sheetPos = _tempSelectedTile;
     }
 }
 
-void tileSetPanelInitializeNewTileSet(char *name, SDL_Rect imageRect, SDL_Texture *image,
-			     uint32 tileSize)
+void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 tileSize)
 {
+    TileSet *currentTileSet = &_tileSets[_numTileSets];
+    ++_numTileSets;
     //TODO(denis): currentTileSet.name has to be freed if ever
     // the tileset is deleted
-    _tileSets[_numTileSets].name = name;
-    _tileSets[_numTileSets].imageSize = imageRect;
-    _tileSets[_numTileSets].image = image;
-    _tileSets[_numTileSets].tileSize = tileSize;
-    ++_numTileSets;
+    currentTileSet->name = name;
+    currentTileSet->surface = image;
+    currentTileSet->image = SDL_CreateTextureFromSurface(_renderer, image);
+    currentTileSet->tileSize = tileSize;
+    SDL_GetClipRect(image, &currentTileSet->imageSize);
+    
+    uint32 numXTiles = currentTileSet->imageSize.w/tileSize;
+    uint32 numYTiles = currentTileSet->imageSize.h/tileSize;
+    currentTileSet->tiles = (Tile*)HEAP_ALLOC(sizeof(Tile)*numXTiles*numYTiles);
+    currentTileSet->numTiles = 0;
+
+    //NOTE(denis): keep track of every valid tile in the tile set
+    for (uint32 i = 0; i < numYTiles; ++i)
+    {
+	for (uint32 j = 0; j < numXTiles; ++j)
+	{
+	    SDL_Rect currentTile = {j*tileSize, i*tileSize, tileSize, tileSize};
+	    if (tileIsValid(image, currentTile))
+	    {
+		(*(currentTileSet->tiles + currentTileSet->numTiles)).sheetPos = currentTile;
+		++currentTileSet->numTiles;
+	    }
+	}
+    }
     
     if (_numTileSets == 1)
     {
@@ -236,14 +302,14 @@ void tileSetPanelInitializeNewTileSet(char *name, SDL_Rect imageRect, SDL_Textur
 	SWAP_DATA(_tileSetDropDown.items[newPos],
 		  _tileSetDropDown.items[0], TextBox);
     }
-
+    
     _selectedTile.pos.w = tileSize;
     _selectedTile.pos.h = tileSize;
     _selectedTile.sheetPos.x = 0;
     _selectedTile.sheetPos.y = 0;
     _selectedTile.sheetPos.w = tileSize;
     _selectedTile.sheetPos.h = tileSize;
-					    
+    
     _selectedTileText.pos.y = _panel.panel.pos.y + _panel.getHeight() -
 	_selectedTileText.pos.h - PADDING - tileSize/2;
     _selectedTile.pos.y = _selectedTileText.pos.y - tileSize/2 + _selectedTileText.pos.h/2;

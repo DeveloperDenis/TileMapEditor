@@ -6,6 +6,7 @@
 #include "denis_meta.h"
 #include "denis_math.h"
 
+struct SDL_Surface;
 struct SDL_Texture;
 
 //TODO(denis): probably a temporary header file that will be replaced
@@ -22,9 +23,13 @@ struct TileSet
 
     //TODO(denis): should this just be a width + height property?
     SDL_Rect imageSize;
-    
+
+    SDL_Surface *surface;
     SDL_Texture *image;
     uint32 tileSize;
+
+    Tile *tiles;
+    uint32 numTiles;
 
     SDL_Rect collisionBox;
 };
