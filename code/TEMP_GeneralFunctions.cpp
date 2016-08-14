@@ -120,6 +120,6 @@ static bool moveSelectionInRect(TexturedRect *selectionBox, Vector2 mousePos,
 	else
 	    shouldBeDrawn = false;
     }
-
-    return shouldBeDrawn;    
+    
+    return shouldBeDrawn;
 }

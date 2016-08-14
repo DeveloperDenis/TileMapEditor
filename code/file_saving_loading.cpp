@@ -61,7 +61,7 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 		{
 		    for (int j = 0; j < tileMap->widthInTiles; ++j)
 		    {
-			Tile* tile = (tileMap->tiles + i*tileMap->widthInTiles + j);
+			TileMapTile* tile = (tileMap->tiles + i*tileMap->widthInTiles + j);
 			int tileValue;
 
 			if (tile->sheetPos.w != 0 && tile->sheetPos.h != 0)

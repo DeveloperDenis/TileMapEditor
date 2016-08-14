@@ -21,7 +21,6 @@ struct TileSet
 {
     char *name;
 
-    //TODO(denis): should this just be a width + height property?
     SDL_Rect imageSize;
 
     SDL_Surface *surface;
@@ -30,8 +29,6 @@ struct TileSet
 
     Tile *tiles;
     uint32 numTiles;
-
-    SDL_Rect collisionBox;
 };
 
 //TODO(denis): not sure where to put this

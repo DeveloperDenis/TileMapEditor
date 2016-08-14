@@ -4,9 +4,25 @@
 #include "denis_meta.h"
 #include "SDL_keycode.h"
 
+struct TileMapTile
+{
+    union
+    {
+	Tile tile;
+	
+	struct
+	{
+	    SDL_Rect pos;
+	    SDL_Rect sheetPos;
+	};
+    };
+
+    bool initialized;
+};
+
 struct TileMap
 {
-    Tile *tiles;
+    TileMapTile *tiles;
     char *name;
     int tileSize;
     int widthInTiles;

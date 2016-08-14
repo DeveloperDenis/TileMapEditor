@@ -70,15 +70,15 @@ static TileMap createNewTileMap(int startX, int startY,
     *outWidth = newTileMap.widthInTiles*newTileMap.tileSize;
     *outHeight = newTileMap.heightInTiles*newTileMap.tileSize;
     
-    int memorySize = sizeof(Tile)*newTileMap.widthInTiles*newTileMap.heightInTiles;
-    newTileMap.tiles = (Tile*) HEAP_ALLOC(memorySize);
-
+    int memorySize = sizeof(TileMapTile)*newTileMap.widthInTiles*newTileMap.heightInTiles;
+    newTileMap.tiles = (TileMapTile*) HEAP_ALLOC(memorySize);
+    
     if (newTileMap.tiles)
     {	
-	Tile *row = newTileMap.tiles;
+	TileMapTile *row = newTileMap.tiles;
 	for (int i = 0; i < newTileMap.heightInTiles; ++i)
 	{
-	    Tile *element = row;
+	    TileMapTile *element = row;
 	    for (int j = 0; j < newTileMap.widthInTiles; ++j)
 	    {
 		SDL_Rect rect;
@@ -89,7 +89,17 @@ static TileMap createNewTileMap(int startX, int startY,
 		rect.y = newTileMap.offset.y + i*newTileMap.tileSize;
 		
 		element->pos = rect;
-		element->sheetPos.w = element->sheetPos.h = newTileMap.tileSize;
+
+		if (tileSetPanelGetCurrentTileSet())
+		{
+		    Tile tile = tileSetPanelGetSelectedTile();
+		    element->sheetPos = tile.sheetPos;
+		    element->initialized = true;
+		}
+		else
+		{
+		    element->sheetPos.w = element->sheetPos.h = newTileMap.tileSize;
+		}
 		
 		++element;
 	    }
@@ -203,12 +213,13 @@ static void paintSelectedTile(TileMap *tileMap, SDL_Rect tileMapArea,
     Vector2 tilePos = convertScreenPosToTilePos(tileSize, offset,
 						scrollOffset, mousePos);
     
-    Tile *clicked = tileMap->tiles + tilePos.x + tilePos.y*tileMap->widthInTiles;
+    TileMapTile *clicked = tileMap->tiles + tilePos.x + tilePos.y*tileMap->widthInTiles;
 
     if (tileSetPanelGetSelectedTile().sheetPos.w != 0 &&
 	tileSetPanelGetSelectedTile().sheetPos.h != 0)
     {
 	clicked->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+	clicked->initialized = true;
     }
 }
 
@@ -402,17 +413,15 @@ void tileMapPanelDraw()
 		{
 		    for (int32 j = startTileX; j < currentMap->widthInTiles; ++j)
 		    {
-			Tile *element = currentMap->tiles + i*currentMap->widthInTiles + j;
+			TileMapTile *element = currentMap->tiles + i*currentMap->widthInTiles + j;
 
 			SDL_Texture *tileSet = tileSetPanelGetCurrentTileSet();
 
-			bool usingDefault = false;
-			if (!tileSet)
+			if (!tileSet || !element->initialized)
 			{
 			    tileSet = _defaultTile.image;
-			    usingDefault = true;
 			}
-		    
+			
 			SDL_Rect drawRectSheet = element->sheetPos;
 			SDL_Rect drawRectScreen = element->pos;
 
@@ -423,7 +432,7 @@ void tileMapPanelDraw()
 			    drawRectScreen.w -= currentMap->drawOffset.x % tileSize;
 			    drawRectSheet.w = drawRectScreen.w;
 
-			    if (usingDefault)
+			    if (!element->initialized)
 			    {
 				real32 ratio = (real32)_defaultTile.pos.w/(real32)tileSize;
 				drawRectSheet.x += (int32)((currentMap->drawOffset.x % tileSize)*ratio);
@@ -450,7 +459,7 @@ void tileMapPanelDraw()
 			    drawRectScreen.h -= currentMap->drawOffset.y % tileSize;
 			    drawRectSheet.h = drawRectScreen.h;
 
-			    if (usingDefault)
+			    if (!element->initialized)
 			    {
 				real32 ratio = (real32)_defaultTile.pos.h/(real32)tileSize;
 				drawRectSheet.y += (int32)((currentMap->drawOffset.y % tileSize)*ratio);
@@ -851,6 +860,7 @@ void tileMapPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 			if (tileSetPanelGetSelectedTile().sheetPos.w != 0)
 			{
 			    (currentMap->tiles + i*currentMap->widthInTiles + j)->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
+			    (currentMap->tiles + i*currentMap->widthInTiles + j)->initialized = true;
 			}
 		    }
 		}
@@ -988,8 +998,32 @@ void tileMapPanelSetVisible(bool newValue)
 
 bool tileMapPanelTileMapIsValid()
 {
-    //TODO(denis): actually check things here
-    return _tileMaps[_selectedTileMap].name != 0;
+    bool result = false;
+    
+    TileMap *currentMap = &_tileMaps[_selectedTileMap];
+
+    if (currentMap->tiles)
+    {
+	bool allInitialized = true;
+	
+	for (int i = 0; i < currentMap->heightInTiles && allInitialized; ++i)
+	{
+	    for (int j = 0; j < currentMap->widthInTiles && allInitialized; ++j)
+	    {
+		TileMapTile *currentTile =
+		    currentMap->tiles + j + i*currentMap->widthInTiles;
+
+		if (!currentTile->initialized)
+		{
+		    allInitialized = false;
+		}
+	    }
+	}
+
+	result = allInitialized && (currentMap->name != 0);
+    }
+    
+    return result;
 }
 
 TileMap* tileMapPanelGetCurrentTileMap()
