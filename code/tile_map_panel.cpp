@@ -405,13 +405,15 @@ void tileMapPanelDraw()
 		int32 startTileX = (currentMap->drawOffset.x)/tileSize;
 		int32 startTileY = (currentMap->drawOffset.y)/tileSize;
 
-		//TODO(denis): test this out and replace the current for loop bounds
-		int32 endTileX = currentMap->visibleArea.w/tileSize + currentMap->drawOffset.x/tileSize;
-		int32 endTileY = currentMap->visibleArea.h/tileSize + currentMap->drawOffset.y/tileSize;
-			    
-		for (int32 i = startTileY; i < currentMap->heightInTiles; ++i)
+		int32 endTileX = (currentMap->visibleArea.w + currentMap->drawOffset.x)/tileSize;
+		endTileX = MIN(endTileX, currentMap->widthInTiles-1);
+		
+		int32 endTileY = (currentMap->visibleArea.h + currentMap->drawOffset.y)/tileSize;
+		endTileY = MIN(endTileY, currentMap->heightInTiles-1);
+		
+		for (int32 i = startTileY; i <= endTileY; ++i)
 		{
-		    for (int32 j = startTileX; j < currentMap->widthInTiles; ++j)
+		    for (int32 j = startTileX; j <= endTileX; ++j)
 		    {
 			TileMapTile *element = currentMap->tiles + i*currentMap->widthInTiles + j;
 
@@ -447,7 +449,7 @@ void tileMapPanelDraw()
 			    if (drawRectScreen.x+drawRectScreen.w >
 				currentMap->visibleArea.x+currentMap->visibleArea.w)
 			    {
-				drawRectSheet.w = currentMap->drawOffset.x % tileSize;
+				drawRectSheet.w = currentMap->visibleArea.x+currentMap->visibleArea.w - drawRectScreen.x;
 				drawRectScreen.w = drawRectSheet.w;
 			    }
 			}
@@ -474,19 +476,12 @@ void tileMapPanelDraw()
 			    if (drawRectScreen.y + drawRectScreen.h >
 				currentMap->visibleArea.y + currentMap->visibleArea.h)
 			    {
-				drawRectSheet.h = currentMap->drawOffset.y % tileSize;
+				drawRectSheet.h = currentMap->visibleArea.y + currentMap->visibleArea.h - drawRectScreen.y;
 				drawRectScreen.h = drawRectSheet.h;
 			    }
 			}
-		    
-			//TODO(denis): if new bounds works, remove this if statement
-			if (drawRectScreen.x+drawRectScreen.w >= currentMap->visibleArea.x
-			    && drawRectScreen.x <= currentMap->visibleArea.x + currentMap->visibleArea.w &&
-			    drawRectScreen.y + drawRectScreen.h >= currentMap->visibleArea.y &&
-			    drawRectScreen.y <= currentMap->visibleArea.y + currentMap->visibleArea.h)
-			{
-			    SDL_RenderCopy(_renderer, tileSet, &drawRectSheet, &drawRectScreen);
-			}
+			
+			SDL_RenderCopy(_renderer, tileSet, &drawRectSheet, &drawRectScreen);
 		    }
 		}
 
@@ -936,41 +931,32 @@ TileMap* tileMapPanelAddNewTileMap()
     
     _selectedTileMap = _numTileMaps;
     ++_numTileMaps;
-			
+    
     result->visibleArea = _tileMapArea;
-    //TODO(denis): these don't have to be restricted to only
-    // showing a multiple of tile sizes
-    result->visibleArea.w = MIN(tileMapWidth, (_tileMapArea.w/tileSize)*tileSize);
-    result->visibleArea.h = MIN(tileMapHeight, (_tileMapArea.h/tileSize)*tileSize);
-			
+    result->visibleArea.w = MIN(tileMapWidth, _tileMapArea.w);
+    result->visibleArea.h = MIN(tileMapHeight, _tileMapArea.h);
+    
     if (tileMapWidth > _tileMapArea.w)
     {
-	int32 backgroundWidth = (_tileMapArea.w/tileSize)*tileSize;
-	result->visibleArea.w = backgroundWidth;
-
 	real32 sizeRatio = (real32)_tileMapArea.w/(real32)tileMapWidth;
-	int32 bigBarWidth = backgroundWidth;
 	int32 smallBarWidth = (int32)(_tileMapArea.w*sizeRatio);
 	int32 barX = _tileMapArea.x;
-	int32 barY = result->offset.y + result->visibleArea.h + 4;
+	int32 barY = result->offset.y + result->visibleArea.h;
 	
         result->horizontalBar =
-	    ui_createScrollBar(barX, barY, bigBarWidth, smallBarWidth,
+	    ui_createScrollBar(barX, barY, _tileMapArea.w, smallBarWidth,
 			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
 			       false);
     }
     if (tileMapHeight > _tileMapArea.h)
     {
-	int32 backgroundHeight = (_tileMapArea.h/tileSize)*tileSize;
-	result->visibleArea.h = backgroundHeight;
-
 	real32 sizeRatio = (real32)_tileMapArea.h/(real32)tileMapHeight;
-	int32 barX = result->offset.x + result->visibleArea.w + 4;
+	int32 barX = result->offset.x + result->visibleArea.w;
 	int32 barY = _tileMapArea.y;
 	int32 smallBarWidth = (int32)(_tileMapArea.h*sizeRatio);
 	
         result->verticalBar =
-	    ui_createScrollBar(barX, barY, backgroundHeight, smallBarWidth,
+	    ui_createScrollBar(barX, barY, _tileMapArea.h, smallBarWidth,
 			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
 			       true);
     }
