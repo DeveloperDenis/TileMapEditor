@@ -139,8 +139,7 @@ void tileSetPanelDraw()
 
 		lastY = yValue;
 		
-		currentTile->pos.w = tileSize;
-		currentTile->pos.h = tileSize;
+		currentTile->size = tileSize;
 
 		_tempSelectedTile.w = _tempSelectedTile.h = tileSize;
 
@@ -150,14 +149,14 @@ void tileSetPanelDraw()
 		    _tempSelectedTile.x = currentTile->sheetPos.x;
 		    _tempSelectedTile.y = currentTile->sheetPos.y;
 		}
-		
-		SDL_RenderCopy(_renderer, _tileSets[0].image,
-			       &currentTile->sheetPos, &currentTile->pos);
+
+		drawTile(_renderer, _tileSets[0].image, currentTile->sheetPos,
+			 currentTile->pos, currentTile->size);
 	    }
 	    
 	    ui_draw(&_selectedTileText);
-	    SDL_RenderCopy(_renderer, _tileSets[0].image,
-			   &_selectedTile.sheetPos, &_selectedTile.pos);
+	    drawTile(_renderer, _tileSets[0].image, _selectedTile.sheetPos,
+		     _selectedTile.pos, _selectedTile.size);
 	}
 
 	//TODO(denis): bad fix for the drawing order problem
@@ -184,10 +183,13 @@ void tileSetPanelOnMouseMove(Vector2 mousePos)
 	    for (uint32 i = 0; i < _tileSets[0].numTiles; ++i)
 	    {
 		Tile *currentTile = &_tileSets[0].tiles[i];
+
+		SDL_Rect tileRect = {currentTile->pos.x, currentTile->pos.y,
+				     currentTile->size, currentTile->size};
 		
-		if (pointInRect(mousePos, currentTile->pos))
+		if (pointInRect(mousePos, tileRect))
 		{
-		    _selectionBox.pos = currentTile->pos;
+		    _selectionBox.pos = tileRect;
 		    _selectionVisible = true;
 		}
 	    }
@@ -203,7 +205,11 @@ void tileSetPanelOnMouseDown(Vector2 mousePos, uint8 mouseButton)
 
 	for (uint32 i = 0; i < _tileSets[0].numTiles; ++i)
 	{
-	    if (pointInRect(mousePos, _tileSets[0].tiles[i].pos))
+	    Tile *currentTile = &_tileSets[0].tiles[i];
+	    SDL_Rect tileRect = {currentTile->pos.x, currentTile->pos.y,
+				 currentTile->size, currentTile->size};
+	    
+	    if (pointInRect(mousePos, tileRect))
 		_startedClick = true;
 	}
     }
@@ -247,7 +253,9 @@ void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
     }
     else if (_selectionVisible && _startedClick && mouseButton == SDL_BUTTON_LEFT)
     {
-	_selectedTile.sheetPos = _tempSelectedTile;
+	_selectedTile.sheetPos.x = _tempSelectedTile.x;
+	_selectedTile.sheetPos.y = _tempSelectedTile.y;
+	_selectedTile.size = _tempSelectedTile.w;
     }
 }
 
@@ -276,7 +284,10 @@ void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 til
 	    SDL_Rect currentTile = {j*tileSize, i*tileSize, tileSize, tileSize};
 	    if (tileIsValid(image, currentTile))
 	    {
-		(*(currentTileSet->tiles + currentTileSet->numTiles)).sheetPos = currentTile;
+		Tile *nextTile = (currentTileSet->tiles + currentTileSet->numTiles);
+		nextTile->sheetPos.x = j*tileSize;
+		nextTile->sheetPos.y = i*tileSize;
+		nextTile->size = tileSize;
 		++currentTileSet->numTiles;
 	    }
 	}
@@ -299,8 +310,7 @@ void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 til
 		  _tileSetDropDown.items[0], TextBox);
     }
     
-    _selectedTile.pos.w = tileSize;
-    _selectedTile.pos.h = tileSize;
+    _selectedTile.size = tileSize;
     _selectedTile.sheetPos = currentTileSet->tiles[0].sheetPos;
     
     _selectedTileText.pos.y = _panel.panel.pos.y + _panel.getHeight() -
@@ -341,6 +351,11 @@ int tileSetPanelGetCurrentTileSize()
 	result = _tileSets[0].tileSize;
 
     return result;
+}
+
+char* tileSetPanelGetCurrentTileSetFileName()
+{
+    return _tileSets[0].name;
 }
 
 bool tileSetPanelVisible()

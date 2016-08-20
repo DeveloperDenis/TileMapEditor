@@ -1,8 +1,4 @@
 /* TODO(denis):
- * support saving to different formats?
- *
- * loading a tilemap
- * (again in different formats)
  *
  * limit the FPS
  *
@@ -145,6 +141,9 @@ int main(int argc, char* argv[])
 	    
 	    while (running)
 	    {
+		static uint32 topMenuOpenDelay = 0;
+                #define DELAY_THRESHOLD 20
+		
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
@@ -221,14 +220,18 @@ int main(int argc, char* argv[])
 			    }
 			    else if (tileSetPanelVisible() || tileMapPanelVisible())
 			    {
-				if (tileSetPanelVisible())
+				if (!topMenuBar.isOpen() &&
+				    topMenuOpenDelay > DELAY_THRESHOLD)
 				{
-				    tileSetPanelOnMouseDown(mouse, mouseButton);
-				}
+				    if (tileSetPanelVisible())
+				    {
+					tileSetPanelOnMouseDown(mouse, mouseButton);
+				    }
 
-				if (tileMapPanelVisible())
-				{
-				    tileMapPanelOnMouseDown(mouse, mouseButton);
+				    if (tileMapPanelVisible())
+				    {
+					tileMapPanelOnMouseDown(mouse, mouseButton);
+				    }
 				}
 			    }
 			   
@@ -237,7 +240,7 @@ int main(int argc, char* argv[])
 			} break;
 			
 			case SDL_MOUSEBUTTONUP:
-			{
+			{   
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
 			    
@@ -251,6 +254,8 @@ int main(int argc, char* argv[])
 			    }
 			    else if (topMenuBar.onMouseUp(mouse, event.button.button))
 			    {
+				topMenuOpenDelay = 0;
+				
 				//TODO(denis): need better solution
 				tileSetPanelOnMouseUp({0,0}, mouseButton);
 				
@@ -266,8 +271,39 @@ int main(int argc, char* argv[])
 					//NOTE(denis): 1 == "create new tile map"
 				        openNewTileMapPanel();
 				    }
+				    else if (selectionY == 2)
+				    {
+					//NOTE(denis): 2 == "open tile map file"
+					LoadTileMapResult data = {};
+					data = loadTileMapFromFile();
+
+					TileMapTile *tileMapTiles = (TileMapTile*)HEAP_ALLOC(data.tileMapWidth*data.tileMapHeight*sizeof(TileMapTile));
+
+					assert(tileMapTiles);
+					for (uint32 i = 0; i < data.tileMapHeight; ++i)
+					{
+					    for (uint32 j = 0; j < data.tileMapWidth; ++j)
+					    {
+						(tileMapTiles + i*data.tileMapWidth + j)->tile = *(data.tiles + i*data.tileMapWidth + j);
+						(tileMapTiles + i*data.tileMapWidth + j)->initialized = true;
+					    }
+					}
+
+					HEAP_FREE(data.tiles);
+					
+					TileMap *tileMap = tileMapPanelAddTileMap(tileMapTiles, data.tileMapName, data.tileMapWidth, data.tileMapHeight, data.tileSize);
+					topMenuBar.menus[1].addItem(tileMap->name, topMenuBar.menus[1].itemCount-1);
+
+					//TODO(denis): need to attempt to open the tile set that
+					// is mentioned in the data
+					// (not sure how to do that yet)
+					// do I want to attempt to load, and if it
+					// fails, prompt the user to open the tile
+					// set?
+				    }
 				    else if (selectionY == 3)
 				    {
+					//NOTE(denis): 3 == "save tile map to file"
 					if (tileMapPanelTileMapIsValid())
 					{
 					    TileMap *current = tileMapPanelGetCurrentTileMap();
@@ -309,17 +345,21 @@ int main(int argc, char* argv[])
 			    }
 			    else if (tileSetPanelVisible() || tileMapPanelVisible())
 			    {
-				if (tileSetPanelVisible())
+				if (!topMenuBar.isOpen() &&
+				    topMenuOpenDelay > DELAY_THRESHOLD)
 				{
-				    tileSetPanelOnMouseUp(mouse, mouseButton);
+				    if (tileSetPanelVisible())
+				    {
+					tileSetPanelOnMouseUp(mouse, mouseButton);
 
-				    if (tileSetPanelImportTileSetPressed())
-				        openImportTileSetPanel();
-				}
+					if (tileSetPanelImportTileSetPressed())
+					    openImportTileSetPanel();
+				    }
 			    
-				if (tileMapPanelVisible())
-				{
-				    tileMapPanelOnMouseUp(mouse, mouseButton);
+				    if (tileMapPanelVisible())
+				    {
+					tileMapPanelOnMouseUp(mouse, mouseButton);
+				    }
 				}
 			    }
 			} break;
@@ -387,6 +427,9 @@ int main(int argc, char* argv[])
 		    }
 		}
 
+		if (topMenuOpenDelay <= DELAY_THRESHOLD)
+		    ++topMenuOpenDelay;
+		
 		SDL_SetRenderDrawColor(renderer, BACKGROUND_COLOUR);
 		SDL_RenderClear(renderer);
 
@@ -394,7 +437,7 @@ int main(int argc, char* argv[])
 		{   
 		    if (newTileMapPanelDataReady())
 		    {
-			TileMap *tileMap = tileMapPanelAddNewTileMap();
+			TileMap *tileMap = tileMapPanelCreateNewTileMap();
 			topMenuBar.menus[1].addItem(tileMap->name,
 						    topMenuBar.menus[1].itemCount-1);
 		    }

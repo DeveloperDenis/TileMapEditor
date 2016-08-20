@@ -1,6 +1,7 @@
 #ifndef DENIS_META_H_
 #define DENIS_META_H_
 
+#include "assert.h"
 #include "windows.h"
 #undef max
 
@@ -68,7 +69,7 @@ static inline bool stringsEqual(char *A, char *B)
     return result;
 }
 
-static char* copyString(char *string)
+static char* duplicateString(char *string)
 {
     char *result = 0;
     
@@ -89,6 +90,16 @@ static char* copyString(char *string)
     }
 
     return result;
+}
+
+//NOTE(denis): assumes that destination is big enough to hold all of source's
+// characters
+static void copyIntoString(char *destination, char *source)
+{
+    for (uint32 i = 0; source[i] != 0; ++i)
+    {
+	destination[i] = source[i];
+    }
 }
 
 static inline uint8* growArray(void *array, int arrayLength, int typeSize, int newLength)

@@ -12,8 +12,10 @@ struct TileMapTile
 	
 	struct
 	{
-	    SDL_Rect pos;
-	    SDL_Rect sheetPos;
+	    uint32 size;
+	    
+	    Point2 pos;
+	    Point2 sheetPos;
 	};
     };
 
@@ -64,7 +66,9 @@ void tileMapPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton);
 void tileMapPanelOnKeyPressed(SDL_Keycode key);
 void tileMapPanelOnKeyReleased(SDL_Keycode key);
 
-TileMap* tileMapPanelAddNewTileMap();
+TileMap* tileMapPanelCreateNewTileMap();
+TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
+				uint32 width, uint32 height, uint32 tileSize);
 
 bool tileMapPanelVisible();
 void tileMapPanelSetVisible(bool newValue);

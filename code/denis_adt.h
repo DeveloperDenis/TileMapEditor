@@ -11,7 +11,7 @@ struct Node
 };
 
 struct LinkedList
-{   
+{
     Node *front;
 };
 

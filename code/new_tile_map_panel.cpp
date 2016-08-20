@@ -433,7 +433,7 @@ bool newTileMapPanelDataReady()
 {
     bool result = false;
     
-    char *tileMapName = copyString(_tileMapNameEditText.text);
+    char *tileMapName = duplicateString(_tileMapNameEditText.text);
 
     int tileSize = convertStringToInt(_tileSizeEditText.text, _tileSizeEditText.letterCount);
     int widthInTiles = convertStringToInt(_widthTilesEditText.text, _widthTilesEditText.letterCount);

@@ -1,11 +1,11 @@
 #include "ui_elements.h"
+#include "tile_map_file.h"
 #include "file_saving_loading.h"
-#include "main.h"
 #include "tile_map_panel.h"
-#include "stdio.h"
+#include "tile_set_panel.h"
 #include "windows.h"
+#include "assert.h"
 
-//TODO(denis): also want to be able to save in different formats
 void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 {
     //TODO(denis): maybe make this bigger?
@@ -21,99 +21,132 @@ void saveTileMapToFile(TileMap *tileMap, char *tileMapName)
 	    charsToExtension = i+1;
 	    done = true;
 	    fileName[i] = '.';
-	    fileName[i+1] = 't';
-	    fileName[i+2] = 'x';
-	    fileName[i+3] = 't';
+	    fileName[i+1] = 'm';
+	    fileName[i+2] = 'a';
+	    fileName[i+3] = 'p';
 	    fileName[i+4] = '\0';
 	}
 	else
 	    fileName[i] = tileMapName[i];
     }
-
-    //TODO(denis): Windows wants you to use "Common Item Dialog" instead of this
     
     OPENFILENAME openFileName = {};
     openFileName.lStructSize = sizeof(OPENFILENAME);
-    char *filter = "Text File\0*.txt\0\0";
+    char *filter = "Map File\0*.map\0\0";
     openFileName.lpstrFilter = filter;
     openFileName.lpstrFile = fileName;
     openFileName.nMaxFile = fileNameBufferSize;
-    //TODO(denis): dunno if I want this in the save function
-    //openFileName.lpstrFileTitle = ;
     openFileName.Flags = OFN_OVERWRITEPROMPT;
     openFileName.nFileExtension = (WORD)charsToExtension;
-    openFileName.lpstrDefExt = "txt";
+    openFileName.lpstrDefExt = "map";
     
     BOOL result =  GetSaveFileName(&openFileName);
-
+    
     if (result != 0)
     {
-	//TODO(denis): change the format of the save depending on what the file
-	// extension is
-	
-	FILE *outputFile = NULL;
+	HANDLE fileHandle = CreateFile(fileName, GENERIC_WRITE, FILE_SHARE_READ,
+				       NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+				       NULL);
 
-	if (tileMapName)
+	if (fileHandle != INVALID_HANDLE_VALUE)
 	{
-	    if (fopen_s(&outputFile, fileName, "w") == 0)
-	    {
-		for (int i = 0; i < tileMap->heightInTiles; ++i)
-		{
-		    for (int j = 0; j < tileMap->widthInTiles; ++j)
-		    {
-			TileMapTile* tile = (tileMap->tiles + i*tileMap->widthInTiles + j);
-			int tileValue;
+	    MapFileHeader fileHeader = {};
+	    fileHeader.tileMapWidth = tileMap->widthInTiles;
+	    fileHeader.tileMapHeight = tileMap->heightInTiles;
+	    fileHeader.tileSize = tileMap->tileSize;
 
-			if (tile->sheetPos.w != 0 && tile->sheetPos.h != 0)
-			{
-			    //TODO(denis): dunno if this expression is correct
-			    tileValue = tile->sheetPos.x / tileMap->tileSize +
-				tile->sheetPos.y/tileMap->tileSize*tileMap->widthInTiles;
-			}
-			else
-			{
-			    tileValue = -1;
-			}
-		    
-			fprintf(outputFile, "%d", tileValue);
-		    }
+	    char *tempString = tileSetPanelGetCurrentTileSetFileName();
+	    copyIntoString(fileHeader.tileSheetFileName, tempString);
 
-		    fprintf(outputFile, "\n");
-		}
+	    copyIntoString(fileHeader.tileMapName, tileMap->name);
 	    
-		fclose(outputFile);
+	    uint32 tileMapSizeInBytes = tileMap->widthInTiles*tileMap->heightInTiles*sizeof(Tile);
+	    uint32 bytesToWrite = sizeof(MapFileHeader) + tileMapSizeInBytes;
+	    DWORD bytesWritten = 0;
+
+	    void *bufferToWrite = HEAP_ALLOC(bytesToWrite);
+
+	    for (uint32 i = 0; i < bytesToWrite; ++i)
+	    {
+		uint8 *nextBufferByte = (uint8*)bufferToWrite + i;
+		uint8 *nextCopiedByte = 0;
+		
+		if (i < sizeof(fileHeader))
+		{
+		    nextCopiedByte = (uint8*)(&fileHeader) + i;
+		}
+		else
+		{
+		    nextCopiedByte = (uint8*)(&(tileMap->tiles + (i-sizeof(fileHeader))/sizeof(Tile))->tile) + (i-sizeof(fileHeader))%sizeof(Tile);
+		}
+
+		*nextBufferByte = *nextCopiedByte;
 	    }
+	    
+	    WriteFile(fileHandle, bufferToWrite, bytesToWrite, &bytesWritten, NULL);
+
+	    assert(bytesToWrite == bytesWritten);
+	    
+	    HEAP_FREE(bufferToWrite);
+	    
+	    CloseHandle(fileHandle);
 	}
     }
 }
 
-char* getTileSheetFileName()
+static char* showOpenFileDialog(char *descriptionOfFile, char *fileExtension)
 {
     char *result = 0;
+
+    const uint32 fileNameSize = 512;
+    char *fileNameBuffer = (char*)HEAP_ALLOC(fileNameSize);
     
     OPENFILENAME openFileName = {};
-
-    //TODO(denis): sizeof(char) should always be 1 right?
-    int fileNameSize = 512*sizeof(char);
-    char* fileNameBuffer = (char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
-					 fileNameSize);
-    
     openFileName.lStructSize = sizeof(OPENFILENAME);
-    char *filter = "Tile Sheet file\0*.png\0\0";
+
+    char filter[fileNameSize] = {};
+    uint32 stringIndex;
+    for (stringIndex = 0; descriptionOfFile[stringIndex] != 0; ++stringIndex)
+    {
+	filter[stringIndex] = descriptionOfFile[stringIndex];
+    }
+
+    ++stringIndex;
+    filter[stringIndex++] = '*';
+    filter[stringIndex++] = '.';
+    for (uint32 i = 0; fileExtension[i] != 0; ++i)
+    {
+	filter[stringIndex++] = fileExtension[i];
+    }
+    
     openFileName.lpstrFilter = filter;
     openFileName.lpstrFile = fileNameBuffer;
-    openFileName.nMaxFile = fileNameSize/sizeof(char);
-    //TODO(denis): dunno if I want this in the save function
-    //openFileName.lpstrFileTitle = ;
+    openFileName.nMaxFile = fileNameSize;
     openFileName.Flags = OFN_FILEMUSTEXIST;
-    openFileName.lpstrDefExt = "png";
-    
-    BOOL fileNameFound = GetOpenFileName(&openFileName);
+    openFileName.lpstrDefExt = fileExtension;
 
-    if (fileNameFound != 0)
+    if (GetOpenFileName(&openFileName) != 0)
     {
 	result = fileNameBuffer;
     }
-
+    
     return result;
+}
+
+LoadTileMapResult loadTileMapFromFile()
+{    
+    char *fileDescription = "Tile Map file";
+    char *fileExtension = "map";
+
+    char *fileName = showOpenFileDialog(fileDescription, fileExtension);
+
+    return loadTileMap(fileName);
+}
+
+char* getTileSheetFileName()
+{
+    char *fileDescription = "Tile Sheet file";
+    char *fileExtension = "png";
+    
+    return showOpenFileDialog(fileDescription, fileExtension);
 }

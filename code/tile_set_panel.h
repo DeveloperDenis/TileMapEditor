@@ -18,6 +18,7 @@ Tile tileSetPanelGetSelectedTile();
 SDL_Texture *tileSetPanelGetCurrentTileSet();
 bool tileSetPanelImportTileSetPressed();
 int tileSetPanelGetCurrentTileSize();
+char* tileSetPanelGetCurrentTileSetFileName();
 
 bool tileSetPanelVisible();
 

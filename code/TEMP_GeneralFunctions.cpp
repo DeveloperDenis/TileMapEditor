@@ -6,7 +6,13 @@
 static inline bool pointInRect(Vector2 point, SDL_Rect rect)
 {
     return point.x > rect.x && point.x < rect.x+rect.w &&
-	point.y > rect.y && point.y < rect.y+rect.h;
+        point.y > rect.y && point.y < rect.y+rect.h;
+}
+
+static inline bool pointInRect(Point2 point, SDL_Rect rect)
+{
+    return point.x > rect.x && point.x < rect.x+rect.w &&
+        point.y > rect.y && point.y < rect.y+rect.h;
 }
 
 static inline char* convertIntToString(int num)

@@ -1,20 +1,24 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
+#define DENIS_INTERNAL
+
 #include "SDL_rect.h"
+#include "SDL_render.h"
 #undef max
 #include "denis_meta.h"
 #include "denis_math.h"
 
 struct SDL_Surface;
-struct SDL_Texture;
 
 //TODO(denis): probably a temporary header file that will be replaced
 
 struct Tile
 {
-    SDL_Rect pos;
-    SDL_Rect sheetPos;
+    uint32 size;
+    
+    Point2 pos;
+    Point2 sheetPos;
 };
 
 struct TileSet
@@ -45,5 +49,14 @@ struct TexturedRect
 	this->pos.y = newPos.y;
     }
 };
+
+static inline void drawTile(SDL_Renderer *renderer, SDL_Texture *tileSheet,
+			    Point2 sheetPos, Point2 screenPos, uint32 size)
+{
+    SDL_Rect sheetRect = {sheetPos.x, sheetPos.y, size, size};
+    SDL_Rect screenRect = {screenPos.x, screenPos.y, size, size};
+
+    SDL_RenderCopy(renderer, tileSheet, &sheetRect, &screenRect);
+}
 
 #endif

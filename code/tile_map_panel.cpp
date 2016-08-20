@@ -53,52 +53,90 @@ static uint32 _selectedTileMap;
 static SDL_Cursor *_arrowCursor;
 static SDL_Cursor *_handCursor;
 
-static TileMap createNewTileMap(int startX, int startY,
-				int32 *outWidth, int32 *outHeight)
+static TileMap initializeTileMap(char *name, uint32 width, uint32 height,
+				 uint32 tileSize)
 {
-    TileMap newTileMap = {};
-    newTileMap.offset.x = startX;
-    newTileMap.offset.y = startY;
-    
-    NewTileMapPanelData* data = newTileMapPanelGetData();
+    TileMap result = {};
+    result.offset.x =_tileMapArea.x;
+    result.offset.y = _tileMapArea.y;
 
-    newTileMap.name = data->tileMapName;
-    newTileMap.widthInTiles = data->widthInTiles;
-    newTileMap.heightInTiles = data->heightInTiles;
-    newTileMap.tileSize = data->tileSize;
+    result.name = name;
+    result.widthInTiles = width;
+    result.heightInTiles = height;
+    result.tileSize = tileSize;
 
-    *outWidth = newTileMap.widthInTiles*newTileMap.tileSize;
-    *outHeight = newTileMap.heightInTiles*newTileMap.tileSize;
+    return result;
+}
+
+static void fitTileMapToPanel(TileMap *tileMap)
+{
+    //TODO(denis): centre the tile map on the screen
     
-    int memorySize = sizeof(TileMapTile)*newTileMap.widthInTiles*newTileMap.heightInTiles;
+    uint32 tileSize = tileMap->tileSize;
+    int32 tileMapWidth = tileMap->widthInTiles*tileSize;
+    int32 tileMapHeight = tileMap->heightInTiles*tileSize;
+    
+    tileMap->visibleArea = _tileMapArea;
+    tileMap->visibleArea.w = MIN(tileMapWidth, _tileMapArea.w);
+    tileMap->visibleArea.h = MIN(tileMapHeight, _tileMapArea.h);
+    
+    if (tileMapWidth > _tileMapArea.w)
+    {
+	real32 sizeRatio = (real32)_tileMapArea.w/(real32)tileMapWidth;
+	int32 smallBarWidth = (int32)(_tileMapArea.w*sizeRatio);
+	int32 barX = _tileMapArea.x;
+	int32 barY = tileMap->offset.y + tileMap->visibleArea.h;
+	
+        tileMap->horizontalBar =
+	    ui_createScrollBar(barX, barY, _tileMapArea.w, smallBarWidth,
+			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
+			       false);
+    }
+    if (tileMapHeight > _tileMapArea.h)
+    {
+	real32 sizeRatio = (real32)_tileMapArea.h/(real32)tileMapHeight;
+	int32 barX = tileMap->offset.x + tileMap->visibleArea.w;
+	int32 barY = _tileMapArea.y;
+	int32 smallBarWidth = (int32)(_tileMapArea.h*sizeRatio);
+	
+        tileMap->verticalBar =
+	    ui_createScrollBar(barX, barY, _tileMapArea.h, smallBarWidth,
+			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
+			       true);
+    }
+}
+
+static TileMap createNewTileMap(char *name, uint32 width, uint32 height,
+				uint32 tileSize)
+{
+    TileMap newTileMap = initializeTileMap(name, width, height, tileSize);
+    
+    int memorySize = sizeof(TileMapTile) * width * height;
     newTileMap.tiles = (TileMapTile*) HEAP_ALLOC(memorySize);
     
     if (newTileMap.tiles)
     {	
 	TileMapTile *row = newTileMap.tiles;
-	for (int i = 0; i < newTileMap.heightInTiles; ++i)
+	for (uint32 i = 0; i < height; ++i)
 	{
 	    TileMapTile *element = row;
-	    for (int j = 0; j < newTileMap.widthInTiles; ++j)
-	    {
-		SDL_Rect rect;
-		
-		rect.h = newTileMap.tileSize;
-		rect.w = newTileMap.tileSize;
-		rect.x = newTileMap.offset.x + j*newTileMap.tileSize;
-		rect.y = newTileMap.offset.y + i*newTileMap.tileSize;
-		
-		element->pos = rect;
+	    for (uint32 j = 0; j < width; ++j)
+	    {		
+		element->pos.x = newTileMap.offset.x + j*newTileMap.tileSize;
+		element->pos.y = newTileMap.offset.y + i*newTileMap.tileSize;
+		element->size = newTileMap.tileSize;
 
+		//TODO(denis): probably shouldn't call this function every iteration
 		if (tileSetPanelGetCurrentTileSet())
 		{
 		    Tile tile = tileSetPanelGetSelectedTile();
 		    element->sheetPos = tile.sheetPos;
+		    element->size = tile.size;
 		    element->initialized = true;
 		}
 		else
 		{
-		    element->sheetPos.w = element->sheetPos.h = newTileMap.tileSize;
+		    element->size =  newTileMap.tileSize;
 		}
 		
 		++element;
@@ -215,8 +253,7 @@ static void paintSelectedTile(TileMap *tileMap, SDL_Rect tileMapArea,
     
     TileMapTile *clicked = tileMap->tiles + tilePos.x + tilePos.y*tileMap->widthInTiles;
 
-    if (tileSetPanelGetSelectedTile().sheetPos.w != 0 &&
-	tileSetPanelGetSelectedTile().sheetPos.h != 0)
+    if (tileSetPanelGetSelectedTile().size != 0)
     {
 	clicked->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
 	clicked->initialized = true;
@@ -424,8 +461,12 @@ void tileMapPanelDraw()
 			    tileSet = _defaultTile.image;
 			}
 			
-			SDL_Rect drawRectSheet = element->sheetPos;
-			SDL_Rect drawRectScreen = element->pos;
+			SDL_Rect drawRectSheet =
+			    {element->sheetPos.x, element->sheetPos.y,
+			     element->size, element->size};
+			SDL_Rect drawRectScreen =
+			    {element->pos.x, element->pos.y,
+			     element->size, element->size};
 
 			if (drawRectScreen.x - currentMap->drawOffset.x
 			    < currentMap->visibleArea.x)
@@ -852,7 +893,7 @@ void tileMapPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 		{
 		    for (int j = startTile.x; j <= endTile.x; ++j)
 		    {
-			if (tileSetPanelGetSelectedTile().sheetPos.w != 0)
+			if (tileSetPanelGetSelectedTile().size != 0)
 			{
 			    (currentMap->tiles + i*currentMap->widthInTiles + j)->sheetPos = tileSetPanelGetSelectedTile().sheetPos;
 			    (currentMap->tiles + i*currentMap->widthInTiles + j)->initialized = true;
@@ -914,59 +955,50 @@ void tileMapPanelOnKeyReleased(SDL_Keycode key)
     }
 }
 
-TileMap* tileMapPanelAddNewTileMap()
+TileMap* tileMapPanelCreateNewTileMap()
 {
     TileMap *result = 0;
-    
-    int32 x = _tileMapArea.x;
-    int32 y = _tileMapArea.y;
-    int32 tileMapWidth = 0;
-    int32 tileMapHeight = 0;
 
-    int32 tileSize = 0;
-			
-    _tileMaps[_numTileMaps] = createNewTileMap(x, y, &tileMapWidth, &tileMapHeight);
+    NewTileMapPanelData *data = newTileMapPanelGetData();
+    _tileMaps[_numTileMaps] =
+	createNewTileMap(data->tileMapName, data->widthInTiles, data->heightInTiles,
+			 data->tileSize);
+
     result = &_tileMaps[_numTileMaps];
-    tileSize = result->tileSize;
+
+    fitTileMapToPanel(result);
     
     _selectedTileMap = _numTileMaps;
     ++_numTileMaps;
-    
-    result->visibleArea = _tileMapArea;
-    result->visibleArea.w = MIN(tileMapWidth, _tileMapArea.w);
-    result->visibleArea.h = MIN(tileMapHeight, _tileMapArea.h);
-    
-    if (tileMapWidth > _tileMapArea.w)
-    {
-	real32 sizeRatio = (real32)_tileMapArea.w/(real32)tileMapWidth;
-	int32 smallBarWidth = (int32)(_tileMapArea.w*sizeRatio);
-	int32 barX = _tileMapArea.x;
-	int32 barY = result->offset.y + result->visibleArea.h;
-	
-        result->horizontalBar =
-	    ui_createScrollBar(barX, barY, _tileMapArea.w, smallBarWidth,
-			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
-			       false);
-    }
-    if (tileMapHeight > _tileMapArea.h)
-    {
-	real32 sizeRatio = (real32)_tileMapArea.h/(real32)tileMapHeight;
-	int32 barX = result->offset.x + result->visibleArea.w;
-	int32 barY = _tileMapArea.y;
-	int32 smallBarWidth = (int32)(_tileMapArea.h*sizeRatio);
-	
-        result->verticalBar =
-	    ui_createScrollBar(barX, barY, _tileMapArea.h, smallBarWidth,
-			       SCROLL_BAR_WIDTH, SCROLL_BAR_BIG_COLOUR, SCROLL_BAR_SMALL_COLOUR,
-			       true);
-    }
 
     newTileMapPanelResetData();
     newTileMapPanelSetVisible(false);
 
     if (_selectionBox.pos.w == 0 && _selectionBox.pos.h == 0)
     {
-	initializeSelectionBox(_renderer, &_selectionBox, tileSize);
+	initializeSelectionBox(_renderer, &_selectionBox, result->tileSize);
+    }
+
+    return result;
+}
+
+TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
+			    uint32 width, uint32 height, uint32 tileSize)
+{
+    TileMap *result = 0;
+    _tileMaps[_numTileMaps] = initializeTileMap(name, width, height, tileSize);
+    result = &_tileMaps[_numTileMaps];
+
+    _selectedTileMap = _numTileMaps;
+    ++_numTileMaps;
+    
+    result->tiles = tiles;
+
+    fitTileMapToPanel(result);
+
+    if (_selectionBox.pos.w == 0 && _selectionBox.pos.h == 0)
+    {
+	initializeSelectionBox(_renderer, &_selectionBox, result->tileSize);
     }
 
     return result;

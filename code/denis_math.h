@@ -1,6 +1,11 @@
 #ifndef DENIS_MATH_H_
 #define DENIS_MATH_H_
 
+struct Point2
+{
+    int32 x, y;
+};
+
 struct Vector2
 {
     //TODO(denis): change these to floats?
