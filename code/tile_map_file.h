@@ -5,6 +5,7 @@
 
 #include "stdint.h"
 
+typedef uint8_t uint8;
 typedef int32_t int32;
 typedef uint32_t uint32;
 
@@ -13,14 +14,15 @@ struct Point2
     int32 x, y;
 };
 
-struct Tile
+struct LoadedTile
 {
     uint32 size;
     
     Point2 pos;
     Point2 sheetPos;
 };
-
+#else
+#define LoadedTile Tile
 #endif
 
 struct MapFileHeader
@@ -43,7 +45,7 @@ struct LoadTileMapResult
     
     char *tileSheetFileName;
 
-    Tile *tiles;
+    LoadedTile *tiles;
 };
 
 //NOTE(denis): you want to call this function with the full path name
