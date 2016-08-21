@@ -14,7 +14,8 @@ Programmed in C/C++ using the SDL2 library.
   - tile sheets are automatically cropped and any empty tiles are removed from drawing
   - open as many as 15 different tile sets at a time and switch between them easily using a dropdown menu
   
-- save tile maps in a simple custom file format to use directly in your game, or to load back into the program later for further editing  
+- save tile maps in a simple custom file format to use directly in your game, or to load back into the program later for further editing
+
 ### Known Issues/Planned Additions
 
 - if you switch tile sets while editing a tile map, every tile in the tile map is drawn using whichever tile set is currently active, no matter which tile set you used to create it
