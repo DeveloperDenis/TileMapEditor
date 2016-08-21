@@ -16,6 +16,11 @@ Programmed in C/C++ using the SDL2 library.
   
 - save tile maps in a simple custom file format to use directly in your game, or to load back into the program later for further editing
 
+### Screenshots / GIFs
+![Screenshot of app](/screenshot1.png?raw=true "App Screenshot")
+![gif of app](/gif1.gif?raw=true "App gif")
+![gif of app](/gif2.gif?raw=true "App gif")
+
 ### Known Issues/Planned Additions
 
 - if you switch tile sets while editing a tile map, every tile in the tile map is drawn using whichever tile set is currently active, no matter which tile set you used to create it
