@@ -33,6 +33,8 @@ struct TileSet
 
     Tile *tiles;
     uint32 numTiles;
+
+    Tile selectedTile;
 };
 
 //TODO(denis): not sure where to put this

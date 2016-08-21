@@ -27,7 +27,6 @@ static uint32 _numTileSets;
 static UIPanel _panel;
 static DropDownMenu _tileSetDropDown;
 static TexturedRect _selectedTileText;
-static Tile _selectedTile;
 static SDL_Rect _tempSelectedTile;
 
 static TexturedRect _selectionBox;
@@ -155,8 +154,8 @@ void tileSetPanelDraw()
 	    }
 	    
 	    ui_draw(&_selectedTileText);
-	    drawTile(_renderer, _tileSets[0].image, _selectedTile.sheetPos,
-		     _selectedTile.pos, _selectedTile.size);
+	    drawTile(_renderer, _tileSets[0].image, _tileSets[0].selectedTile.sheetPos,
+		     _tileSets[0].selectedTile.pos, _tileSets[0].selectedTile.size);
 	}
 
 	//TODO(denis): bad fix for the drawing order problem
@@ -235,9 +234,6 @@ void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 		    _tileSetDropDown.items[selection].setPosition(_tileSetDropDown.items[0].getPosition());
 		    SWAP_DATA(_tileSetDropDown.items[selection],
 			      _tileSetDropDown.items[0], TextBox);
-
-		    _selectedTile.sheetPos.x = 0;
-		    _selectedTile.sheetPos.y = 0;
 		}
 	    }
 	}
@@ -253,9 +249,9 @@ void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
     }
     else if (_selectionVisible && _startedClick && mouseButton == SDL_BUTTON_LEFT)
     {
-	_selectedTile.sheetPos.x = _tempSelectedTile.x;
-	_selectedTile.sheetPos.y = _tempSelectedTile.y;
-	_selectedTile.size = _tempSelectedTile.w;
+	_tileSets[0].selectedTile.sheetPos.x = _tempSelectedTile.x;
+	_tileSets[0].selectedTile.sheetPos.y = _tempSelectedTile.y;
+	_tileSets[0].selectedTile.size = _tempSelectedTile.w;
     }
 }
 
@@ -292,6 +288,16 @@ void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 til
 	    }
 	}
     }
+
+    currentTileSet->selectedTile.size = tileSize;
+    currentTileSet->selectedTile.sheetPos = currentTileSet->tiles[0].sheetPos;
+    
+    _selectedTileText.pos.y = _panel.panel.pos.y + _panel.getHeight() -
+	_selectedTileText.pos.h - PADDING - tileSize/2;
+
+    currentTileSet->selectedTile.pos.x = _selectedTileText.pos.x + _selectedTileText.pos.w + PADDING;
+    currentTileSet->selectedTile.pos.y = _selectedTileText.pos.y;
+    currentTileSet->selectedTile.pos.y = _selectedTileText.pos.y - tileSize/2 + _selectedTileText.pos.h/2;
     
     if (_numTileSets == 1)
     {
@@ -309,20 +315,13 @@ void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 til
 	SWAP_DATA(_tileSetDropDown.items[newPos],
 		  _tileSetDropDown.items[0], TextBox);
     }
-    
-    _selectedTile.size = tileSize;
-    _selectedTile.sheetPos = currentTileSet->tiles[0].sheetPos;
-    
-    _selectedTileText.pos.y = _panel.panel.pos.y + _panel.getHeight() -
-	_selectedTileText.pos.h - PADDING - tileSize/2;
-    _selectedTile.pos.y = _selectedTileText.pos.y - tileSize/2 + _selectedTileText.pos.h/2;
 
     initializeSelectionBox(_renderer, &_selectionBox, tileSize);
 }
 
 Tile tileSetPanelGetSelectedTile()
 {
-    return _selectedTile;
+    return _tileSets[0].selectedTile;
 }
 
 SDL_Texture* tileSetPanelGetCurrentTileSet()
@@ -384,7 +383,4 @@ void tileSetPanelSetPosition(Vector2 newPos)
 	_selectedTileText.pos.y = y;
 	_selectedTileText.pos.x = x;
     }
-
-    _selectedTile.pos.x = _selectedTileText.pos.x + _selectedTileText.pos.w + PADDING;
-    _selectedTile.pos.y = _selectedTileText.pos.y;
 }

@@ -402,7 +402,7 @@ bool ui_init(SDL_Renderer *renderer, char *fontName, int fontSize)
 	    
         _cursor.pos.w = 5;
         _cursor.pos.h = 15;
-        _cursor.flashRate = 300;
+        _cursor.flashRate = 22;
         _cursor.visible = true;
 	
 	result = true;

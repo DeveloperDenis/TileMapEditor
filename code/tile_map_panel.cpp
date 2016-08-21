@@ -12,6 +12,8 @@
 
 #define PADDING 15
 
+#define PANEL_COLOUR 0xFF333333
+
 #define SCROLL_BAR_WIDTH 25
 #define SCROLL_BAR_BIG_COLOUR 0xFFFFFFFF
 #define SCROLL_BAR_SMALL_COLOUR 0xFFAAAAAA
@@ -366,10 +368,7 @@ void tileMapPanelCreateNew(SDL_Renderer *renderer, uint32 x, uint32 y,
 
     _defaultTile = loadImage(_renderer, "default_tile.png");
     
-    {
-	uint32 colour = 0xFFEE2288;
-	_panel = ui_createPanel(x, y, width, height, colour);
-    }
+    _panel = ui_createPanel(x, y, width, height, PANEL_COLOUR);
 
     _createNewButton = ui_createTextButton("Create New Tile Map", 0xFFFFFFFF, 0, 0,
 					   0xFFFF0000);
@@ -404,8 +403,8 @@ void tileMapPanelCreateNew(SDL_Renderer *renderer, uint32 x, uint32 y,
 
 	_tileMapArea.x = _panel.panel.pos.x + PADDING;
 	_tileMapArea.y = _panel.panel.pos.y + PADDING;
-	_tileMapArea.w = x - _tileMapArea.x - PADDING - SCROLL_BAR_WIDTH;
-	_tileMapArea.h = _panel.panel.pos.h - PADDING - SCROLL_BAR_WIDTH;
+	_tileMapArea.w = x - _tileMapArea.x - PADDING - SCROLL_BAR_WIDTH - 5;
+	_tileMapArea.h = _panel.panel.pos.h - PADDING - SCROLL_BAR_WIDTH - 5;
     }
     ui_addToPanel(&_paintToolIcon, &_panel);
     ui_addToPanel(&_fillToolIcon, &_panel);

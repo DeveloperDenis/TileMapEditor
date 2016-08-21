@@ -1,7 +1,5 @@
 /* TODO(denis):
  *
- * limit the FPS
- *
  * CTRL + N -> create new tile map
  * CTRL + O -> open tile map
  * CTRL + S -> save current tile map
@@ -77,8 +75,8 @@ int main(int argc, char* argv[])
     
     if (window)
     {
-	//TODO(denis): maybe add renderer flags?
-	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
+	uint32 renderFlags = SDL_RENDERER_PRESENTVSYNC;
+	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, renderFlags);
 
 	if (renderer && ui_init(renderer, defaultFontName, defaultFontSize)
 	    && IMG_Init(IMG_INIT_PNG) != 0)
