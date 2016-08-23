@@ -10,6 +10,12 @@
  * add a keyboard shortcut to change to next tool and change to previous tool
  *
  * add tool tips
+ *
+ * when typing in the panels, disable the shortcut keys
+ *
+ * when using the fill tool, make right click cancel the selection entirely
+ *
+ * add the ability to close maps and tile sets
  */
 
 //IMPORTANT(denis): note to self, design everything expecting at least a 1280 x 720
@@ -38,6 +44,7 @@
 
 static inline void openNewTileMapPanel()
 {
+    newTileMapPanelResetData();
     newTileMapPanelSetVisible(true);
 
     int32 tileSize = tileSetPanelGetCurrentTileSize();
@@ -289,7 +296,8 @@ int main(int argc, char* argv[])
 
 					HEAP_FREE(data.tiles);
 					
-					TileMap *tileMap = tileMapPanelAddTileMap(tileMapTiles, data.tileMapName, data.tileMapWidth, data.tileMapHeight, data.tileSize);
+					TileMap *tileMap = tileMapPanelAddTileMap(tileMapTiles, data.tileMapName, data.tileMapWidth, data.tileMapHeight, data.tileSize,
+										  data.tileSheetFileName);
 					topMenuBar.menus[1].addItem(tileMap->name, topMenuBar.menus[1].itemCount-1);
 
 					//TODO(denis): need to attempt to open the tile set that
@@ -298,6 +306,19 @@ int main(int argc, char* argv[])
 					// do I want to attempt to load, and if it
 					// fails, prompt the user to open the tile
 					// set?
+
+					// check module directory, then current directory
+					// using GetModuleFileName and GetCurrentDirectory
+					TCHAR fileNameBuffer[MAX_PATH+1];
+					DWORD result = GetModuleFileName(NULL, fileNameBuffer, MAX_PATH+1);
+					if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+					{
+					    
+					}
+					else
+					{
+					    //TODO(denis): try again with a bigger buffer?
+					}
 				    }
 				    else if (selectionY == 3)
 				    {

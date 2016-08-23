@@ -324,9 +324,24 @@ Tile tileSetPanelGetSelectedTile()
     return _tileSets[0].selectedTile;
 }
 
-SDL_Texture* tileSetPanelGetCurrentTileSet()
+TileSet* tileSetPanelGetCurrentTileSet()
 {
-    return _tileSets[0].image;
+    return &_tileSets[0];
+}
+
+TileSet* tileSetPanelGetTileSetByName(char* name)
+{
+    TileSet *result = 0;
+    
+    for (uint32 i = 0; i < _numTileSets && !result; ++i)
+    {
+	if (stringsEqual(name, _tileSets[i].name))
+	{
+	    result = &_tileSets[i];
+	}
+    }
+
+    return result;
 }
 
 bool tileSetPanelImportTileSetPressed()

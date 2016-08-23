@@ -48,7 +48,7 @@ static Vector2 _lastFramePos;
 static ToolType _currentTool;
 static ToolType _previousTool;
 
-static TileMap _tileMaps[5];
+static TileMap _tileMaps[15];
 static uint32 _numTileMaps;
 static uint32 _selectedTileMap;
 
@@ -129,7 +129,7 @@ static TileMap createNewTileMap(char *name, uint32 width, uint32 height,
 		element->size = newTileMap.tileSize;
 
 		//TODO(denis): probably shouldn't call this function every iteration
-		if (tileSetPanelGetCurrentTileSet())
+		if (tileSetPanelGetCurrentTileSet()->tiles)
 		{
 		    Tile tile = tileSetPanelGetSelectedTile();
 		    element->sheetPos = tile.sheetPos;
@@ -453,11 +453,27 @@ void tileMapPanelDraw()
 		    {
 			TileMapTile *element = currentMap->tiles + i*currentMap->widthInTiles + j;
 
-			SDL_Texture *tileSet = tileSetPanelGetCurrentTileSet();
-
-			if (!tileSet || !element->initialized)
+			TileSet *tileSet = 0;
+			if (currentMap->tileSetName)
 			{
-			    tileSet = _defaultTile.image;
+			    tileSet = tileSetPanelGetTileSetByName(currentMap->tileSetName);
+			}
+			else
+			{
+			    tileSet = tileSetPanelGetCurrentTileSet();
+			}
+
+			SDL_Texture *tileSetImage = 0;
+			if (tileSet)
+			    tileSetImage = tileSet->image;
+
+			if (!tileSetImage || !element->initialized)
+			{
+			    tileSetImage = _defaultTile.image;
+			}
+			else if (tileSetImage && !currentMap->tileSetName)
+			{
+			    currentMap->tileSetName = tileSet->name;
 			}
 			
 			SDL_Rect drawRectSheet =
@@ -521,7 +537,7 @@ void tileMapPanelDraw()
 			    }
 			}
 			
-			SDL_RenderCopy(_renderer, tileSet, &drawRectSheet, &drawRectScreen);
+			SDL_RenderCopy(_renderer, tileSetImage, &drawRectSheet, &drawRectScreen);
 		    }
 		}
 
@@ -542,8 +558,6 @@ void tileMapPanelOnMouseMove(Vector2 mousePos, int32 leftClickFlag)
     TileMap *currentMap = &_tileMaps[_selectedTileMap];
     int32 tileSize = currentMap->tileSize;
 
-    //TODO(denis): could probably simplify the two if statements into one function
-    // call
     if (currentMap->horizontalBar.scrolling)
     {
 	scrollTileMap(&currentMap->horizontalBar, false, mousePos, currentMap);
@@ -970,7 +984,6 @@ TileMap* tileMapPanelCreateNewTileMap()
     _selectedTileMap = _numTileMaps;
     ++_numTileMaps;
 
-    newTileMapPanelResetData();
     newTileMapPanelSetVisible(false);
 
     if (_selectionBox.pos.w == 0 && _selectionBox.pos.h == 0)
@@ -982,7 +995,8 @@ TileMap* tileMapPanelCreateNewTileMap()
 }
 
 TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
-			    uint32 width, uint32 height, uint32 tileSize)
+				uint32 width, uint32 height, uint32 tileSize,
+				char* tileSetName)
 {
     TileMap *result = 0;
     _tileMaps[_numTileMaps] = initializeTileMap(name, width, height, tileSize);
@@ -992,6 +1006,7 @@ TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
     ++_numTileMaps;
     
     result->tiles = tiles;
+    result->tileSetName = tileSetName;
 
     fitTileMapToPanel(result);
 

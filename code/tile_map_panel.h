@@ -37,9 +37,8 @@ struct TileMap
 
     ScrollBar horizontalBar;
     ScrollBar verticalBar;
-    
-    //TODO(denis): create a setPosition function that will reposition all of the
-    // tiles contained within as well
+
+    char *tileSetName;
     
     SDL_Rect getRect()
     {
@@ -68,7 +67,8 @@ void tileMapPanelOnKeyReleased(SDL_Keycode key);
 
 TileMap* tileMapPanelCreateNewTileMap();
 TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
-				uint32 width, uint32 height, uint32 tileSize);
+				uint32 width, uint32 height, uint32 tileSize,
+				char *tileSetName);
 
 bool tileMapPanelVisible();
 void tileMapPanelSetVisible(bool newValue);

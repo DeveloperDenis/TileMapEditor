@@ -15,7 +15,10 @@ void tileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton);
 void tileSetPanelInitializeNewTileSet(char *name, SDL_Surface *image, uint32 tileSize);
 
 Tile tileSetPanelGetSelectedTile();
-SDL_Texture *tileSetPanelGetCurrentTileSet();
+
+TileSet* tileSetPanelGetCurrentTileSet();
+TileSet* tileSetPanelGetTileSetByName(char* name);
+
 bool tileSetPanelImportTileSetPressed();
 int tileSetPanelGetCurrentTileSize();
 char* tileSetPanelGetCurrentTileSetFileName();
