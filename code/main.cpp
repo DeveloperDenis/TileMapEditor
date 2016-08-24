@@ -16,6 +16,15 @@
  * when using the fill tool, make right click cancel the selection entirely
  *
  * add the ability to close maps and tile sets
+ *
+ * Whenever a tile sheet is imported, copy the image file into a directory made by
+ * the program ("tilesheets" or something) and when loading a tile map, check in
+ * that directory first, and then prompt the user to load a tile set if not found
+ * The problem with this approach is that if the tile sheet is changed outside the 
+ * program, I might be loading an out of date file
+ * so maybe prompt the user if the tile set I'm about to load is the actual one
+ * they want?
+ *
  */
 
 //IMPORTANT(denis): note to self, design everything expecting at least a 1280 x 720
@@ -307,17 +316,63 @@ int main(int argc, char* argv[])
 					// fails, prompt the user to open the tile
 					// set?
 
+					SDL_Surface *tileSet = 0;
+					
 					// check module directory, then current directory
 					// using GetModuleFileName and GetCurrentDirectory
 					TCHAR fileNameBuffer[MAX_PATH+1];
 					DWORD result = GetModuleFileName(NULL, fileNameBuffer, MAX_PATH+1);
 					if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
 					{
+					    char filePath[MAX_PATH+1] = {};
+					    uint32 indexOfLastSlash = 0;
+					    for (int i = 0; i < MAX_PATH; ++i)
+					    {
+						if (fileNameBuffer[i] == '\\')
+						    indexOfLastSlash = i;
+					    }
+
+					    copyIntoString(filePath, fileNameBuffer,
+							   0, indexOfLastSlash);
 					    
+					    char *tileSheetFullPath = concatStrings(filePath, data.tileSheetFileName);
+
+					    tileSet = loadImageAsSurface(tileSheetFullPath);
+					    HEAP_FREE(tileSheetFullPath);
 					}
 					else
 					{
 					    //TODO(denis): try again with a bigger buffer?
+					}
+
+					if (!tileSet)
+					{
+					    fileNameBuffer[0] = 0;
+					    result = GetCurrentDirectory(MAX_PATH+1, fileNameBuffer);
+
+					    if (result != 0 && result <= MAX_PATH+1)
+					    {
+						fileNameBuffer[result] = '\\';
+						fileNameBuffer[result+1] = 0;
+						
+					        char *tileSheetFullPath = concatStrings(fileNameBuffer, data.tileSheetFileName);
+
+						tileSet = loadImageAsSurface(tileSheetFullPath);
+						HEAP_FREE(tileSheetFullPath);
+					    }
+					    else
+					    {
+						//TODO(denis): try again with bigger buffer?
+					    }
+					}
+
+					if (tileSet)
+					{
+					    tileSetPanelInitializeNewTileSet(data.tileSheetFileName, tileSet, data.tileSize);
+					}
+					else
+					{
+					    //TODO(denis): prompt the user to open the tile set
 					}
 				    }
 				    else if (selectionY == 3)

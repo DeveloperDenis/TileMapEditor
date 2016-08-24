@@ -94,12 +94,60 @@ static char* duplicateString(char *string)
 
 //NOTE(denis): assumes that destination is big enough to hold all of source's
 // characters
-static void copyIntoString(char *destination, char *source)
+static inline void copyIntoString(char *destination, char *source)
 {
-    for (uint32 i = 0; source[i] != 0; ++i)
+    if (destination && source)
     {
-	destination[i] = source[i];
+	for (uint32 i = 0; source[i] != 0; ++i)
+	{
+	    destination[i] = source[i];
+	}
     }
+}
+
+//NOTE(denis): copies a portion of source into destination,
+// the first character copied is index = beginning
+// and the last character copied is at index = end
+static inline void copyIntoString(char *destination, char *source,
+			   uint32 beginning, uint32 end)
+{
+    uint32 destinationIndex = 0;
+    
+    if (destination && source && beginning < end)
+    {
+	for (uint32 i = beginning; i <= end; ++i)
+	{
+	    destination[destinationIndex++] = source[i];
+	}
+    }
+}
+
+//NOTE(denis): returns a new string which is a+b
+static char* concatStrings(char *a, char *b)
+{
+    uint32 sizeOfA = 0;
+    uint32 sizeOfB = 0;
+    char *result = 0;
+
+    if (a && b)
+    {
+	for (uint32 i = 0; a[i] != 0; ++i)
+	{
+	    ++sizeOfA;
+	}
+
+	for (uint32 i = 0; b[i] != 0; ++i)
+	{
+	    ++sizeOfB;
+	}
+
+	result = (char*)HEAP_ALLOC(sizeOfA+sizeOfB+1);
+
+	copyIntoString(result, a);
+	copyIntoString(result+sizeOfA, b);
+    }
+    
+    return result;
 }
 
 static inline uint8* growArray(void *array, int arrayLength, int typeSize, int newLength)
