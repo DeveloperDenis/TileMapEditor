@@ -135,16 +135,36 @@ void importTileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 		    if (fileName[i+1] == 0)
 			endOfFileName = i+1;
 		}
-
+		
 		char* fileNameTruncated =
 		    (char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (endOfFileName-startOfFileName+1)*sizeof(char));
+
+		//TODO(denis): replace with call to copyString()
 		for (int i = 0; i < endOfFileName-startOfFileName; ++i)
 		{
 		    fileNameTruncated[i] = fileName[i+startOfFileName];
 		}
-		//TODO(denis): don't have the ".png" part?
+
 		fileNameTruncated[endOfFileName-startOfFileName] = 0;
 
+		
+		char *programPath = getProgramPathName();
+
+		if (programPath)
+		{
+		    char *tileSheetFolderPath = concatStrings(programPath, TILE_SHEET_FOLDER);
+		    char *tileSheetNewFullPath = concatStrings(tileSheetFolderPath, fileNameTruncated);
+
+		    BOOL result = CopyFileEx(fileName, tileSheetNewFullPath, 0, 0, 0, 0);
+		    if (result == 0)
+		    {
+			//TODO(denis): failed to copy the file
+		    }
+
+		    HEAP_FREE(programPath);
+		    HEAP_FREE(tileSheetFolderPath);
+		}
+		
 		tileSetPanelInitializeNewTileSet(fileNameTruncated, newTileSheet,
 						 tileSize);
 		

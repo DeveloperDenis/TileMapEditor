@@ -152,6 +152,22 @@ int main(int argc, char* argv[])
 		
 		tileMapPanelCreateNew(renderer, x, y, width, height);
 	    }
+
+	    
+	    char *programPathName = getProgramPathName();
+	    char *tileSheetDirectory = concatStrings(programPathName, TILE_SHEET_FOLDER);
+	    
+	    if (CreateDirectory(tileSheetDirectory, NULL) == 0)
+	    {
+		if (GetLastError() != ERROR_ALREADY_EXISTS)
+		{
+		    //TODO(denis): probably want to try again or log the error or
+		    // something
+		}
+	    }
+
+	    HEAP_FREE(programPathName);
+	    programPathName = 0;
 	    
 	    while (running)
 	    {
@@ -309,65 +325,21 @@ int main(int argc, char* argv[])
 										  data.tileSheetFileName);
 					topMenuBar.menus[1].addItem(tileMap->name, topMenuBar.menus[1].itemCount-1);
 
-					//TODO(denis): need to attempt to open the tile set that
-					// is mentioned in the data
-					// (not sure how to do that yet)
-					// do I want to attempt to load, and if it
-					// fails, prompt the user to open the tile
-					// set?
 
 					SDL_Surface *tileSet = 0;
-					
-					// check module directory, then current directory
-					// using GetModuleFileName and GetCurrentDirectory
-					TCHAR fileNameBuffer[MAX_PATH+1];
-					DWORD result = GetModuleFileName(NULL, fileNameBuffer, MAX_PATH+1);
-					if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+
+					if (tileSheetDirectory)
 					{
-					    char filePath[MAX_PATH+1] = {};
-					    uint32 indexOfLastSlash = 0;
-					    for (int i = 0; i < MAX_PATH; ++i)
-					    {
-						if (fileNameBuffer[i] == '\\')
-						    indexOfLastSlash = i;
-					    }
-
-					    copyIntoString(filePath, fileNameBuffer,
-							   0, indexOfLastSlash);
-					    
-					    char *tileSheetFullPath = concatStrings(filePath, data.tileSheetFileName);
-
+					    char *tileSheetFullPath = concatStrings(tileSheetDirectory, data.tileSheetFileName);
 					    tileSet = loadImageAsSurface(tileSheetFullPath);
 					    HEAP_FREE(tileSheetFullPath);
-					}
-					else
-					{
-					    //TODO(denis): try again with a bigger buffer?
-					}
-
-					if (!tileSet)
-					{
-					    fileNameBuffer[0] = 0;
-					    result = GetCurrentDirectory(MAX_PATH+1, fileNameBuffer);
-
-					    if (result != 0 && result <= MAX_PATH+1)
-					    {
-						fileNameBuffer[result] = '\\';
-						fileNameBuffer[result+1] = 0;
-						
-					        char *tileSheetFullPath = concatStrings(fileNameBuffer, data.tileSheetFileName);
-
-						tileSet = loadImageAsSurface(tileSheetFullPath);
-						HEAP_FREE(tileSheetFullPath);
-					    }
-					    else
-					    {
-						//TODO(denis): try again with bigger buffer?
-					    }
 					}
 
 					if (tileSet)
 					{
+					    //TODO(denis): should probably prompt the user
+					    // and ask if the tilesheet I'm about to load
+					    // is the one they want.
 					    tileSetPanelInitializeNewTileSet(data.tileSheetFileName, tileSet, data.tileSize);
 					}
 					else

@@ -2,6 +2,7 @@
 #define MAIN_H_
 
 #define DENIS_INTERNAL
+#define TILE_SHEET_FOLDER "tilesheets\\"
 
 #include "SDL_rect.h"
 #include "SDL_render.h"

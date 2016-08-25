@@ -3,6 +3,36 @@
 #include "denis_math.h"
 #include "math.h"
 
+static char* getProgramPathName()
+{
+    char *result = 0;
+    
+    TCHAR fileNameBuffer[MAX_PATH+1];
+    DWORD getFileNameResult = GetModuleFileName(NULL, fileNameBuffer, MAX_PATH+1);
+    if (getFileNameResult != 0 &&
+	GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+    {
+	char filePath[MAX_PATH+1] = {};
+	uint32 indexOfLastSlash = 0;
+	for (int i = 0; i < MAX_PATH; ++i)
+	{
+	    if (fileNameBuffer[i] == '\\')
+		indexOfLastSlash = i;
+	}
+
+	copyIntoString(filePath, fileNameBuffer,
+		       0, indexOfLastSlash);
+
+	result = duplicateString(filePath);
+    }
+    else
+    {
+	//TODO(denis): try again with a bigger buffer?
+    }
+
+    return result;
+}
+
 static inline bool pointInRect(Vector2 point, SDL_Rect rect)
 {
     return point.x > rect.x && point.x < rect.x+rect.w &&
