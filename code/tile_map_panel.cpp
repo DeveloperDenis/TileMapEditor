@@ -1018,6 +1018,30 @@ TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
     return result;
 }
 
+void tileMapPanelRemoveTileMap(uint32 position)
+{
+    if (position >= 0 && position < _numTileMaps)
+    {
+	_selectedTileMap = MIN(position-1, 0);
+	
+	HEAP_FREE(_tileMaps[position].tiles);
+	HEAP_FREE(_tileMaps[position].name);
+	HEAP_FREE(_tileMaps[position].tileSetName);
+
+	for (uint32 i = position+1; i < _numTileMaps; ++i)
+	{
+	    _tileMaps[i-1] = _tileMaps[i];
+	}
+	
+	--_numTileMaps;
+    }
+
+    if (_numTileMaps == 0)
+    {
+	_tileMaps[0] = {};
+    }
+}
+
 bool tileMapPanelVisible()
 {
     return _panel.visible;
@@ -1061,6 +1085,11 @@ bool tileMapPanelTileMapIsValid()
 TileMap* tileMapPanelGetCurrentTileMap()
 {
     return &_tileMaps[_selectedTileMap];
+}
+
+uint32 tileMapPanelGetCurrentTileMapIndex()
+{
+    return _selectedTileMap;
 }
 
 void tileMapPanelSelectTileMap(uint32 newSelection)

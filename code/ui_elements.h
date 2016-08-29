@@ -34,7 +34,10 @@ struct TextBox
     TexturedRect text;
     SDL_Rect pos;
 
-    int getWidth() { return this->pos.w; };
+    uint32 textColour;
+    
+    int32 getWidth() { return this->pos.w; };
+    int32 getHeight() { return this->pos.h; };
     void setPosition(Vector2 newPos);
     Vector2 getPosition();
 };
@@ -85,6 +88,7 @@ struct DropDownMenu
     int getHeight() { return this->getRect().h; };
     
     void addItem(char *newText, int position);
+    void removeItem(int32 position);
     void changeItem(char *newText, int position);
     uint32 getItemAt(Vector2 pos);
 };
@@ -179,6 +183,7 @@ void ui_eraseLetter(UIPanel *panel);
 void ui_eraseLetter(EditText *editText);
 
 void ui_setText(EditText *editText, char* text);
+void ui_setText(TextBox *textBox, char *text);
 
 TexturedRect ui_createTextField(char *text, int x, int y, uint32 colour);
 TextBox ui_createTextBox(char *text, int minWidth, int minHeight, uint32 textColour,

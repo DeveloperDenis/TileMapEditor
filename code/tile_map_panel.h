@@ -69,12 +69,14 @@ TileMap* tileMapPanelCreateNewTileMap();
 TileMap* tileMapPanelAddTileMap(TileMapTile *tiles, char *name,
 				uint32 width, uint32 height, uint32 tileSize,
 				char *tileSetName);
+void tileMapPanelRemoveTileMap(uint32 position);
 
 bool tileMapPanelVisible();
 void tileMapPanelSetVisible(bool newValue);
 
 bool tileMapPanelTileMapIsValid();
 TileMap* tileMapPanelGetCurrentTileMap();
+uint32 tileMapPanelGetCurrentTileMapIndex();
 void tileMapPanelSelectTileMap(uint32 newSelection);
 
 #endif

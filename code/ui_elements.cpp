@@ -174,6 +174,19 @@ void DropDownMenu::addItem(char *newText, int position)
     ++this->itemCount;
 }
 
+void DropDownMenu::removeItem(int32 position)
+{
+    if (position >= 0 && position < this->itemCount)
+    {	
+	for (int32 i = position+1; i < this->itemCount; ++i)
+	{
+	    *(this->items + (i-1)) = *(this->items + i);
+	}
+    }
+
+    --this->itemCount;
+}
+
 void DropDownMenu::changeItem(char *newText, int position)
 {
     if (position < this->itemCount)
@@ -554,6 +567,12 @@ void ui_setText(EditText *editText, char* text)
     }
 }
 
+void ui_setText(TextBox *textBox, char *text)
+{
+    textBox->text = ui_createTextField(text, textBox->pos.x, textBox->pos.y,
+				       textBox->textColour);
+}
+
 void ui_processLetterTyped(char c, UIPanel *panel)
 {
     EditText *editText = getSelectedEditText(panel);
@@ -729,8 +748,6 @@ void ui_delete(DropDownMenu *dropDownMenu)
     dropDownMenu->startedClick = false;
 }
 
-//TODO(denis): perhaps have multiple versions that do a different kind of
-// TTF_RenderText, like Shaded and Solid
 TexturedRect ui_createTextField(char *text, int x, int y, uint32 colour)
 {
     TexturedRect result = {};
@@ -752,8 +769,9 @@ TextBox ui_createTextBox(char *text, int minWidth, int minHeight,
 			 uint32 textColour, uint32 backgroundColour)
 {
     TextBox result = {};
+    result.textColour = textColour;
 
-    result.text = ui_createTextField(text, 0, 0, textColour);
+    ui_setText(&result, text);
 
     int backgroundWidth = minWidth > result.text.pos.w ? minWidth : result.text.pos.w;
     int backgroundHeight = minHeight > result.text.pos.h ? minHeight : result.text.pos.h;

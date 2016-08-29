@@ -14,7 +14,7 @@ static char* getProgramPathName()
     {
 	char filePath[MAX_PATH+1] = {};
 	uint32 indexOfLastSlash = 0;
-	for (int i = 0; i < MAX_PATH; ++i)
+	for (int i = 0; i < MAX_PATH && fileNameBuffer[i] != 0; ++i)
 	{
 	    if (fileNameBuffer[i] == '\\')
 		indexOfLastSlash = i;
