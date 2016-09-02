@@ -571,6 +571,8 @@ void ui_setText(TextBox *textBox, char *text)
 {
     textBox->text = ui_createTextField(text, textBox->pos.x, textBox->pos.y,
 				       textBox->textColour);
+    textBox->string = text;
+    textBox->setPosition(textBox->getPosition());
 }
 
 void ui_processLetterTyped(char c, UIPanel *panel)
@@ -770,7 +772,7 @@ TextBox ui_createTextBox(char *text, int minWidth, int minHeight,
 {
     TextBox result = {};
     result.textColour = textColour;
-
+    
     ui_setText(&result, text);
 
     int backgroundWidth = minWidth > result.text.pos.w ? minWidth : result.text.pos.w;

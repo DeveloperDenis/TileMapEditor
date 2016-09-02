@@ -479,6 +479,9 @@ void tileMapPanelDraw()
 			SDL_Rect drawRectSheet =
 			    {element->sheetPos.x, element->sheetPos.y,
 			     element->size, element->size};
+
+			//TODO(denis): this could be done using currentMap->offset.x + j*element->size
+			// etc.
 			SDL_Rect drawRectScreen =
 			    {element->pos.x, element->pos.y,
 			     element->size, element->size};

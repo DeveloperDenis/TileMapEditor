@@ -17,8 +17,10 @@ struct Point2
 struct LoadedTile
 {
     uint32 size;
-    
+
+    //TODO(denis): pos is useless, probably shouldn't save it
     Point2 pos;
+    
     Point2 sheetPos;
 };
 #else

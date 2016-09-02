@@ -3,6 +3,33 @@
 #include "denis_math.h"
 #include "math.h"
 
+static char* getFileNameFromPath(char *path)
+{
+    char *result = 0;
+    
+    int startOfFileName = 0;
+    int endOfFileName = 0;
+    for (int i = 0; path[i] != 0; ++i)
+    {
+	if (path[i] == '\\' || path[i] == '/')
+	    startOfFileName = i+1;
+
+	if (path[i+1] == 0)
+	    endOfFileName = i+1;
+    }
+    
+    result = (char*)HEAP_ALLOC((endOfFileName-startOfFileName+1)*sizeof(char));
+
+    if (result)
+    {
+	copyIntoString(result, path, startOfFileName, endOfFileName);
+	
+	result[endOfFileName-startOfFileName] = 0;
+    }
+    
+    return result;
+}
+
 static char* getProgramPathName()
 {
     char *result = 0;

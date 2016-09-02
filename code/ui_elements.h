@@ -34,6 +34,8 @@ struct TextBox
     TexturedRect text;
     SDL_Rect pos;
 
+    char *string;
+
     uint32 textColour;
     
     int32 getWidth() { return this->pos.w; };

@@ -24,8 +24,3 @@ To run the app yourself, just download the "Latest Build.zip" file from the repo
 ![Screenshot of app](/screenshot1.png?raw=true "App Screenshot")
 ![gif of app](/gif1.gif?raw=true "App gif")
 ![gif of app](/gif2.gif?raw=true "App gif")
-
-### Known Issues/Planned Additions
-
-- if you switch tile sets while editing a tile map, every tile in the tile map is drawn using whichever tile set is currently active, no matter which tile set you used to create it
-- if you load a tile map without any tile sets open, nothing will draw until you load a tile set, and it will only draw the way it was created if you have loaded the exact tile set used to create it

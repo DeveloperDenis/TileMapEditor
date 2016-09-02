@@ -15,9 +15,7 @@
  *
  * when using the fill tool, make right click cancel the selection entirely
  *
- * add the ability to close maps and tile sets
- *
- * closing tile maps is a bit weird when there are no more tile maps
+ * add the ability to close tile sets
  *
  * fix the "everything is a different font" issue
  *
@@ -46,6 +44,132 @@
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define BACKGROUND_COLOUR 60,67,69,255
+
+static char* createDateAndTimeString(uint32 year, uint32 month, uint32 day,
+				     uint32 hour, uint32 minute)
+{
+    //NOTE(denis): string format is "00:00 DD/MM/YYYY"
+    uint32 length = 16;
+    
+    char *result = (char*)HEAP_ALLOC(length+1);
+
+    char *yearString = convertIntToString(year);
+    char *monthString = convertIntToString(month);
+    char *dayString = convertIntToString(day);
+    char *hourString = convertIntToString(hour);
+    char *minuteString = convertIntToString(minute);
+    
+    for (uint32 i = 0; i < length; ++i)
+    {
+	if (i < 2)
+	{
+	    if (hour < 10)
+	    {
+		if (i == 0)
+		    result[i] = '0';
+		else if (i == 1)
+		    result[i] = hourString[0];
+	    }
+	    else
+		result[i] = hourString[i];
+	}
+	else if (i == 2)
+	{
+	    result[i] = ':';
+	}
+	else if (i < 5)
+	{
+	    if (minute < 10)
+	    {
+		if (i == 3)
+		    result[i] = '0';
+		else
+		    result[i] = minuteString[0];
+	    }
+	    else
+		result[i] = minuteString[i-3];
+	}
+	else if (i == 5)
+	{
+	    result[i] = ' ';
+	}
+	else if (i < 8)
+	{
+	    if (day < 10)
+	    {
+		if (i == 6)
+		    result[i] = '0';
+		else
+		    result[i] = dayString[0];
+	    }
+	    else
+		result[i] = dayString[i-6];
+	}
+	else if (i == 8)
+	{
+	    result[i] = '/';
+	}
+	else if (i < 11)
+	{
+	    if (month < 10)
+	    {
+		if (i == 9)
+		    result[i] = '0';
+		else
+		    result[i] = monthString[0];
+	    }
+	    else
+		result[i] = monthString[i-9];
+	}
+	else if (i == 11)
+	{
+	    result[i] = '/';
+	}
+	else
+	{
+	    //NOTE(denis): year will probably never be below 999 or above 9999
+	    // so this code will work fine
+	    result[i] = yearString[i-12];
+	}
+    }
+
+    HEAP_FREE(yearString);
+    HEAP_FREE(monthString);
+    HEAP_FREE(dayString);
+    HEAP_FREE(hourString);
+    HEAP_FREE(minuteString);
+    
+    return result;
+}
+
+static char* createLastModifiedString(char *fileName)
+{
+    char *result = 0;
+    
+    WIN32_FILE_ATTRIBUTE_DATA fileInformation = {};
+    SYSTEMTIME lastWriteTimeUniversal = {};
+    SYSTEMTIME lastWriteTimeLocal = {};
+					    
+    if (GetFileAttributesEx(fileName, GetFileExInfoStandard, &fileInformation) != 0)
+    {
+	if (FileTimeToSystemTime(&fileInformation.ftLastWriteTime, &lastWriteTimeUniversal) != 0 &&
+	    SystemTimeToTzSpecificLocalTime(NULL, &lastWriteTimeUniversal, &lastWriteTimeLocal) != 0)
+	{
+	    char *dateAndTimeString =
+		createDateAndTimeString(lastWriteTimeLocal.wYear,
+					lastWriteTimeLocal.wMonth,
+					lastWriteTimeLocal.wDay,
+					lastWriteTimeLocal.wHour,
+					lastWriteTimeLocal.wMinute);
+						    
+	    result = concatStrings("Last modified: ", dateAndTimeString);
+						    
+	    HEAP_FREE(dateAndTimeString);
+	}
+    }
+
+    return result;
+}
 
 static inline void openNewTileMapPanel()
 {
@@ -159,6 +283,9 @@ int main(int argc, char* argv[])
 	    }
 
 	    //NOTE(denis): automatic tile sheet opening panel
+	    LoadTileMapResult loadedTileMapData = {};
+	    SDL_Surface *loadedTileSet = 0;
+	    
 	    UIPanel openTileSheetPanel = {};
 	    TexturedRect titleText = {};
 	    Button openButton = {};
@@ -166,6 +293,7 @@ int main(int argc, char* argv[])
 	    TextBox tileSheetNameText = {};
 	    Button browseButton = {};
 	    TextBox lastModifiedText = {};
+	    TexturedRect warningText = {};
 	    {
 		int32 x, y, width, height;
 		width = WINDOW_WIDTH/2;
@@ -310,7 +438,12 @@ int main(int argc, char* argv[])
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
 
-			    if (importTileSetPanelVisible())
+			    if (openTileSheetPanel.visible)
+			    {
+				ui_processMouseDown(&openTileSheetPanel,
+						    mouse, mouseButton);
+			    }
+			    else if (importTileSetPanelVisible())
 			    {
 				importTileSetPanelOnMouseDown(mouse, mouseButton);
 			    }
@@ -343,8 +476,77 @@ int main(int argc, char* argv[])
 			{   
 			    Vector2 mouse = {event.button.x, event.button.y};
 			    uint8 mouseButton = event.button.button;
-			    
-			    if (importTileSetPanelVisible())
+
+			    if (openTileSheetPanel.visible)
+			    {
+				if (ui_wasClicked(cancelButton, mouse))
+				{
+				    openTileSheetPanel.visible = false;
+				    //TODO(denis): cancel the opening of the tile map
+				}
+				else if (ui_wasClicked(openButton, mouse))
+				{
+				    char *warning = 0;
+				    
+				    if (!stringsEqual(tileSheetNameText.string, "No tile sheet found"))
+				    {
+					uint32 tileMapHeight = loadedTileMapData.tileMapHeight;
+					uint32 tileMapWidth = loadedTileMapData.tileMapWidth;
+					
+					TileMapTile *tileMapTiles = (TileMapTile*)HEAP_ALLOC(tileMapWidth*tileMapHeight*sizeof(TileMapTile));
+
+					assert(tileMapTiles);
+					for (uint32 i = 0; i < tileMapHeight; ++i)
+					{
+					    for (uint32 j = 0; j < tileMapWidth; ++j)
+					    {
+						(tileMapTiles + i*tileMapWidth + j)->tile = *(loadedTileMapData.tiles + i*tileMapWidth + j);
+						(tileMapTiles + i*tileMapWidth + j)->initialized = true;
+					    }
+					}
+
+					HEAP_FREE(loadedTileMapData.tiles);
+					
+					TileMap *tileMap = tileMapPanelAddTileMap(tileMapTiles, loadedTileMapData.tileMapName, tileMapWidth, tileMapHeight, loadedTileMapData.tileSize,
+										  tileSheetNameText.string);
+					addTileMapToMenuBar(&topMenuBar.menus[1], tileMap->name);
+
+					tileSetPanelInitializeNewTileSet(tileSheetNameText.string, loadedTileSet, tileMap->tileSize);
+
+					openTileSheetPanel.visible = false;
+				    }
+				    else
+				    {
+					warning = "must have a valid tile sheet file name";
+				    }
+
+				    if (warning)
+				    {
+					uint32 textColour = 0xFF000000;
+					int32 x = openButton.background.pos.x;
+					int32 y = openButton.background.pos.y - 20;
+					warningText = ui_createTextField(warning, x, y, textColour);;
+				    }
+				}
+				else if (ui_wasClicked(browseButton, mouse))
+				{
+				    char *newTileSheet = getTileSheetFileName();
+				    if (newTileSheet)
+				    {
+					loadedTileSet = loadImageAsSurface(newTileSheet);
+					
+					char *lastModifiedString =
+					    createLastModifiedString(newTileSheet);
+					ui_setText(&lastModifiedText, lastModifiedString);
+					
+					char *tileSheetFileName = getFileNameFromPath(newTileSheet);
+					ui_setText(&tileSheetNameText, tileSheetFileName);
+					
+					HEAP_FREE(newTileSheet);
+				    }
+				}
+			    }
+			    else if (importTileSetPanelVisible())
 			    {
 				importTileSetPanelOnMouseUp(mouse, mouseButton);
 			    }
@@ -374,87 +576,40 @@ int main(int argc, char* argv[])
 				    else if (selectionY == 2)
 				    {
 					//NOTE(denis): 2 == "open tile map file"
-					LoadTileMapResult data = {};
-					data = loadTileMapFromFile();
+					loadedTileMapData = loadTileMapFromFile();
 
-					SDL_Surface *tileSet = 0;
-					//TODO(denis): need to free
-					char *tileSheetFullPath = 0;
+					if (loadedTileMapData.tileMapName)
+					{
+					    //TODO(denis): need to free
+					    char *tileSheetFullPath = 0;
 					
-					if (tileSheetDirectory)
-					{
-					    tileSheetFullPath = concatStrings(tileSheetDirectory, data.tileSheetFileName);
-					    tileSet = loadImageAsSurface(tileSheetFullPath);
-					}
-
-					openTileSheetPanel.visible = true;
-					if (tileSet)
-					{
-					    //TODO(denis): 
-					    // the prompt should have the name of the
-					    // tile sheet, the last date it was modified,
-					    // and maybe a small picture of it?
-					    // or maybe a full sized scrollable picture?
-
-					    //TODO(denis): if the user opens a new tile sheet
-					    // that meddles with the positions of the tiles
-					    // I want my program to recognize where the tiles
-					    // have moved and update the tile map tile sheet positions
-					    // as necessary so that it still draws properly
-					    //tileSetPanelInitializeNewTileSet(data.tileSheetFileName, tileSet, data.tileSize);
-
-					    WIN32_FILE_ATTRIBUTE_DATA fileInformation = {};
-					    SYSTEMTIME lastWriteTimeUniversal = {};
-					    SYSTEMTIME lastWriteTimeLocal = {};
-					    
-					    if (GetFileAttributesEx(tileSheetFullPath, GetFileExInfoStandard, &fileInformation) != 0)
+					    if (tileSheetDirectory)
 					    {
-						if (FileTimeToSystemTime(&fileInformation.ftLastWriteTime, &lastWriteTimeUniversal) != 0 &&
-						    SystemTimeToTzSpecificLocalTime(NULL, &lastWriteTimeUniversal, &lastWriteTimeLocal) != 0)
-						{
-						    char *year = convertIntToString(lastWriteTimeLocal.wYear);
-						    char *month = convertIntToString(lastWriteTimeLocal.wMonth);
-						    char *day = convertIntToString(lastWriteTimeLocal.wDay);
-						    char *hour = convertIntToString(lastWriteTimeLocal.wHour);
-						    char *minute = convertIntToString(lastWriteTimeLocal.wMinute);
-
-						    //TODO(denis): put these into a singular string
-						    // and set the text of lastModifiedText
-						}
+						tileSheetFullPath = concatStrings(tileSheetDirectory, loadedTileMapData.tileSheetFileName);
+						loadedTileSet = loadImageAsSurface(tileSheetFullPath);
 					    }
 
-					    ui_setText(&tileSheetNameText, data.tileSheetFileName);
-					    tileSheetNameText.setPosition(tileSheetNameText.getPosition());
-					}
-					else
-					{
-					    //TODO(denis): use the same prompt but
-					    // the tile sheet is empty and the
-					    // user must open the correct one
-					    // if the tilesheet name is different than
-					    // data.tileSheetFileName then save the
-					    // new name into the tile map
-					}
-
-					//TODO(denis): if it was cancelled, don't do all this
-					
-					TileMapTile *tileMapTiles = (TileMapTile*)HEAP_ALLOC(data.tileMapWidth*data.tileMapHeight*sizeof(TileMapTile));
-
-					assert(tileMapTiles);
-					for (uint32 i = 0; i < data.tileMapHeight; ++i)
-					{
-					    for (uint32 j = 0; j < data.tileMapWidth; ++j)
+					    openTileSheetPanel.visible = true;
+					    if (loadedTileSet)
 					    {
-						(tileMapTiles + i*data.tileMapWidth + j)->tile = *(data.tiles + i*data.tileMapWidth + j);
-						(tileMapTiles + i*data.tileMapWidth + j)->initialized = true;
+						//TODO(denis): 
+						// the prompt should have the name of the
+						// tile sheet, the last date it was modified,
+						// and maybe a small picture of it?
+						// or maybe a full sized scrollable picture?
+
+						//TODO(denis): if the user opens a new tile sheet
+						// that meddles with the positions of the tiles
+						// I want my program to recognize where the tiles
+						// have moved and update the tile map tile sheet positions
+						// as necessary so that it still draws properly
+
+						char *lastModifiedString = createLastModifiedString(tileSheetFullPath);
+						ui_setText(&lastModifiedText, lastModifiedString);
+
+						ui_setText(&tileSheetNameText, loadedTileMapData.tileSheetFileName);
 					    }
 					}
-
-					HEAP_FREE(data.tiles);
-					
-					TileMap *tileMap = tileMapPanelAddTileMap(tileMapTiles, data.tileMapName, data.tileMapWidth, data.tileMapHeight, data.tileSize,
-										  data.tileSheetFileName);
-					addTileMapToMenuBar(&topMenuBar.menus[1], tileMap->name);
 				    }
 				    else if (selectionY == 3)
 				    {

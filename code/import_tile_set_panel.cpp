@@ -124,29 +124,7 @@ void importTileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 
 	    if (newTileSheet != 0)
 	    {
-		char *fileName = _tileSheetEditText.text;
-		int startOfFileName = 0;
-		int endOfFileName = 0;
-		for (int i = 0; fileName[i] != 0; ++i)
-		{
-		    if (fileName[i] == '\\' || fileName[i] == '/')
-			startOfFileName = i+1;
-
-		    if (fileName[i+1] == 0)
-			endOfFileName = i+1;
-		}
-		
-		char* fileNameTruncated =
-		    (char*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, (endOfFileName-startOfFileName+1)*sizeof(char));
-
-		//TODO(denis): replace with call to copyString()
-		for (int i = 0; i < endOfFileName-startOfFileName; ++i)
-		{
-		    fileNameTruncated[i] = fileName[i+startOfFileName];
-		}
-
-		fileNameTruncated[endOfFileName-startOfFileName] = 0;
-
+		char *fileNameTruncated = getFileNameFromPath(_tileSheetEditText.text);
 		
 		char *programPath = getProgramPathName();
 
@@ -155,7 +133,7 @@ void importTileSetPanelOnMouseUp(Vector2 mousePos, uint8 mouseButton)
 		    char *tileSheetFolderPath = concatStrings(programPath, TILE_SHEET_FOLDER);
 		    char *tileSheetNewFullPath = concatStrings(tileSheetFolderPath, fileNameTruncated);
 
-		    BOOL result = CopyFileEx(fileName, tileSheetNewFullPath, 0, 0, 0, 0);
+		    BOOL result = CopyFileEx(_tileSheetEditText.text, tileSheetNewFullPath, 0, 0, 0, 0);
 		    if (result == 0)
 		    {
 			//TODO(denis): failed to copy the file
