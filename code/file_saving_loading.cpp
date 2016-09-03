@@ -146,7 +146,7 @@ LoadTileMapResult loadTileMapFromFile()
 char* getTileSheetFileName()
 {
     char *fileDescription = "Tile Sheet file";
-    char *fileExtension = "png";
+    char *fileExtension = "png;*.bmp";
     
     return showOpenFileDialog(fileDescription, fileExtension);
 }
