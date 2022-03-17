@@ -1,4 +1,4 @@
-# Tile-Map-Editor
+# Tile Map Editor
 
 A simple, fast, and small Windows tile map editor app for games.
 Programmed in C/C++ using the SDL2 library.
